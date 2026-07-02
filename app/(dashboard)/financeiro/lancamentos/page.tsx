@@ -5,45 +5,67 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { LancamentosFiltros } from '@/components/ui/lancamentos-filtros'
 import Link from 'next/link'
 import { Plus, TrendingUp, TrendingDown, Pencil } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, subDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { Suspense } from 'react'
 
 const categoryLabels: Record<string, string> = {
   mensalidade: 'Mensalidade', avulsa: 'Aula Avulsa', repasse: 'Repasse',
   material: 'Material', software: 'Software', taxa: 'Taxa', outros: 'Outros',
 }
 
-export default async function LancamentosPage() {
+const fmt = (v: number, c: string) => c === 'EUR'
+  ? `€ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+  : `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+
+export default async function LancamentosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ dias?: string }>
+}) {
+  const { dias = '30' } = await searchParams
   const supabase = await createClient()
-  const { data: transactions } = await supabase
+
+  let query = supabase
     .from('financial_transactions')
     .select('*, student:students(name), professor:professors(name)')
     .order('transaction_date', { ascending: false })
-    .limit(200)
+    .limit(500)
+
+  if (dias !== 'todos') {
+    const desde = format(subDays(new Date(), parseInt(dias)), 'yyyy-MM-dd')
+    query = query.gte('transaction_date', desde)
+  }
+
+  const { data: transactions } = await query
 
   const entradasBRL = (transactions ?? []).filter(t => t.type === 'entrada' && t.currency === 'BRL').reduce((s, t) => s + t.amount, 0)
   const entradasEUR = (transactions ?? []).filter(t => t.type === 'entrada' && t.currency === 'EUR').reduce((s, t) => s + t.amount, 0)
   const saidasBRL   = (transactions ?? []).filter(t => t.type === 'saida'   && t.currency === 'BRL').reduce((s, t) => s + t.amount, 0)
 
-  const fmt = (v: number, c: string) => c === 'EUR'
-    ? `€ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-    : `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+  const periodoLabel = dias === 'todos' ? 'todo o período' : `últimos ${dias} dia${dias === '1' ? '' : 's'}`
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-h1">Lançamentos</h1>
-          <p className="text-body mt-1">Entradas e saídas financeiras</p>
+          <p className="text-body mt-1" style={{ color: '#6b8c6b' }}>{periodoLabel} · {transactions?.length ?? 0} registros</p>
         </div>
         <Link href="/financeiro/lancamentos/novo">
           <Button><Plus className="h-4 w-4 mr-2" />Novo Lançamento</Button>
         </Link>
       </div>
 
-      {/* Resumo */}
+      {/* Filtro temporal */}
+      <Suspense>
+        <LancamentosFiltros />
+      </Suspense>
+
+      {/* Resumo do período */}
       <div className="grid grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-5">
@@ -92,7 +114,7 @@ export default async function LancamentosPage() {
               {(transactions ?? []).length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-12" style={{ color: '#9dbfa9' }}>
-                    Nenhum lançamento registrado ainda.
+                    Nenhum lançamento neste período.
                   </TableCell>
                 </TableRow>
               ) : (
