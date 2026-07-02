@@ -2,11 +2,11 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import Link from 'next/link'
 import { Plus, Pencil } from 'lucide-react'
+import { countryByCode } from '@/lib/countries'
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   ativo:       { label: 'Ativo',       color: '#1e6b40' },
@@ -74,7 +74,7 @@ export default async function AlunosPage() {
                       </TableCell>
                       <TableCell style={{ color: '#4a5a4a' }}>{s.responsible_name ?? '—'}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{s.country === 'BR' ? '🇧🇷 BR' : '🇪🇺 EU'}</Badge>
+                        {(() => { const c = countryByCode[s.country ?? 'BR']; return c ? `${c.flag} ${c.name}` : s.country })()}
                       </TableCell>
                       <TableCell>
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: st?.color ?? '#6b7280' }}>

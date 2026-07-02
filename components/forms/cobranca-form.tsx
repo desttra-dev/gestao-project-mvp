@@ -10,8 +10,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
-import type { Student, Enrollment } from '@/lib/types'
+import type { Student, Enrollment, Currency } from '@/lib/types'
 import { format } from 'date-fns'
+import { countryByCode, COUNTRIES } from '@/lib/countries'
 
 interface CobrancaFormProps {
   students: Student[]
@@ -30,7 +31,7 @@ export function CobrancaForm({ students, enrollments }: CobrancaFormProps) {
     student_id: '',
     enrollment_id: '',
     amount: '',
-    currency: 'BRL' as 'BRL' | 'EUR',
+    currency: 'BRL' as Currency,
     due_date: today,
     period_reference: currentPeriod,
     payment_method: '' as string,
@@ -50,7 +51,7 @@ export function CobrancaForm({ students, enrollments }: CobrancaFormProps) {
       ...f,
       student_id: studentId,
       enrollment_id: '',
-      currency: student?.country === 'EU' ? 'EUR' : 'BRL',
+      currency: (countryByCode[student?.country ?? 'BR']?.currency ?? 'BRL') as Currency,
     }))
   }
 
@@ -109,7 +110,7 @@ export function CobrancaForm({ students, enrollments }: CobrancaFormProps) {
               <SelectContent>
                 {students.map(s => (
                   <SelectItem key={s.id} value={s.id}>
-                    {s.name} ({s.country === 'BR' ? '🇧🇷' : '🇪🇺'})
+                    {countryByCode[s.country]?.flag ?? ''} {s.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -152,14 +153,16 @@ export function CobrancaForm({ students, enrollments }: CobrancaFormProps) {
               <Label>Moeda</Label>
               <Select
                 value={form.currency}
-                onValueChange={v => { if (v) setForm(f => ({ ...f, currency: v as 'BRL' | 'EUR' })) }}
+                onValueChange={v => { if (v) setForm(f => ({ ...f, currency: v as Currency })) }}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="BRL">BRL (R$)</SelectItem>
-                  <SelectItem value="EUR">EUR (€)</SelectItem>
+                  {Array.from(new Set(COUNTRIES.map(c => c.currency))).map(cur => {
+                    const c = COUNTRIES.find(x => x.currency === cur)!
+                    return <SelectItem key={cur} value={cur}>{cur} ({c.currencySymbol})</SelectItem>
+                  })}
                 </SelectContent>
               </Select>
             </div>

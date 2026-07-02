@@ -1,5 +1,5 @@
-export type Country = 'BR' | 'EU'
-export type Currency = 'BRL' | 'EUR'
+export type Country = 'BR' | 'PT' | 'DE' | 'FR' | 'ES' | 'IT' | 'NL' | 'BE' | 'AT' | 'IE' | 'FI' | 'LU' | 'GR' | 'GB' | 'CH' | 'SE' | 'NO' | 'DK' | 'US' | 'CA'
+export type Currency = 'BRL' | 'EUR' | 'GBP' | 'CHF' | 'USD' | 'CAD' | 'SEK' | 'NOK' | 'DKK'
 export type PlanType = 'avulsa' | 'weekly_1x' | 'weekly_2x' | 'weekly_3x' | 'custom'
 export type ClassLevel = 'fundamental' | 'medio' | 'superior' | 'internacional'
 export type ClassStatus = 'agendada' | 'realizada' | 'cancelada'
