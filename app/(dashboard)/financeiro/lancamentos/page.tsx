@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import Link from 'next/link'
-import { Plus, TrendingUp, TrendingDown } from 'lucide-react'
+import { Plus, TrendingUp, TrendingDown, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -85,12 +85,13 @@ export default async function LancamentosPage() {
                 <TableHead>Aluno / Responsável</TableHead>
                 <TableHead>Categoria</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
+                <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {(transactions ?? []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12" style={{ color: '#9dbfa9' }}>
+                  <TableCell colSpan={7} className="text-center py-12" style={{ color: '#9dbfa9' }}>
                     Nenhum lançamento registrado ainda.
                   </TableCell>
                 </TableRow>
@@ -124,6 +125,11 @@ export default async function LancamentosPage() {
                     </TableCell>
                     <TableCell className="text-right font-semibold" style={{ color: t.type === 'entrada' ? '#1e6b40' : '#b91c1c' }}>
                       {t.type === 'saida' ? '-' : ''}{fmt(t.amount, t.currency)}
+                    </TableCell>
+                    <TableCell>
+                      <Link href={`/financeiro/lancamentos/${t.id}`}>
+                        <Button variant="ghost" size="sm"><Pencil className="h-3.5 w-3.5" /></Button>
+                      </Link>
                     </TableCell>
                   </TableRow>
                 ))
