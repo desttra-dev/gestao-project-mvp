@@ -9,14 +9,28 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import type { Student } from '@/lib/types'
 
-interface AlunoFormProps {
-  student?: Student
-}
+const followUpOptions = [
+  { value: 'none', label: 'Sem retorno agendado' },
+  { value: 'next_week', label: 'Semana que vem' },
+  { value: 'jan', label: 'Janeiro' },
+  { value: 'fev', label: 'Fevereiro' },
+  { value: 'mar', label: 'Março' },
+  { value: 'abr', label: 'Abril' },
+  { value: 'mai', label: 'Maio' },
+  { value: 'jun', label: 'Junho' },
+  { value: 'jul', label: 'Julho' },
+  { value: 'ago', label: 'Agosto' },
+  { value: 'set', label: 'Setembro' },
+  { value: 'out', label: 'Outubro' },
+  { value: 'nov', label: 'Novembro' },
+  { value: 'dez', label: 'Dezembro' },
+]
 
-export function AlunoForm({ student }: AlunoFormProps) {
+export function AlunoForm({ student }: { student?: Student }) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
@@ -26,8 +40,13 @@ export function AlunoForm({ student }: AlunoFormProps) {
     email: student?.email ?? '',
     phone: student?.phone ?? '',
     country: student?.country ?? 'BR',
+    status: student?.status ?? 'ativo',
     notes: student?.notes ?? '',
-    active: student?.active ?? true,
+    responsible_name: student?.responsible_name ?? '',
+    responsible_phone: student?.responsible_phone ?? '',
+    responsible_email: student?.responsible_email ?? '',
+    follow_up: student?.follow_up ?? 'none',
+    follow_up_notes: student?.follow_up_notes ?? '',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,8 +58,14 @@ export function AlunoForm({ student }: AlunoFormProps) {
       email: form.email || null,
       phone: form.phone || null,
       country: form.country,
+      status: form.status,
+      active: form.status === 'ativo',
       notes: form.notes || null,
-      active: form.active,
+      responsible_name: form.responsible_name || null,
+      responsible_phone: form.responsible_phone || null,
+      responsible_email: form.responsible_email || null,
+      follow_up: form.follow_up,
+      follow_up_notes: form.follow_up_notes || null,
     }
 
     let error
@@ -51,12 +76,7 @@ export function AlunoForm({ student }: AlunoFormProps) {
     }
 
     setLoading(false)
-
-    if (error) {
-      toast.error('Erro ao salvar aluno: ' + error.message)
-      return
-    }
-
+    if (error) { toast.error('Erro ao salvar aluno: ' + error.message); return }
     toast.success(student ? 'Aluno atualizado!' : 'Aluno cadastrado!')
     router.push('/alunos')
     router.refresh()
@@ -64,83 +84,101 @@ export function AlunoForm({ student }: AlunoFormProps) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <Card className="max-w-xl">
+      <Card className="max-w-2xl">
         <CardHeader>
-          <CardTitle>{student ? 'Editar Aluno' : 'Novo Aluno'}</CardTitle>
+          <CardTitle className="text-h2">{student ? 'Editar Aluno' : 'Novo Aluno'}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Nome *</Label>
-            <Input
-              id="name"
-              value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              required
-            />
-          </div>
+        <CardContent className="space-y-6">
 
-          <div className="space-y-2">
-            <Label htmlFor="email">E-mail</Label>
-            <Input
-              id="email"
-              type="email"
-              value={form.email}
-              onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="phone">Telefone / WhatsApp</Label>
-            <Input
-              id="phone"
-              value={form.phone}
-              onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>País</Label>
-            <Select
-              value={form.country}
-              onValueChange={v => { if (v) setForm(f => ({ ...f, country: v as 'BR' | 'EU' })) }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="BR">🇧🇷 Brasil</SelectItem>
-                <SelectItem value="EU">🇪🇺 Europa</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="notes">Observações</Label>
-            <Textarea
-              id="notes"
-              value={form.notes}
-              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-              rows={3}
-            />
-          </div>
-
-          {student && (
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select
-                value={form.active ? 'true' : 'false'}
-                onValueChange={v => { if (v) setForm(f => ({ ...f, active: v === 'true' })) }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Ativo</SelectItem>
-                  <SelectItem value="false">Inativo</SelectItem>
-                </SelectContent>
-              </Select>
+          {/* Dados principais */}
+          <div className="space-y-4">
+            <p className="text-label uppercase tracking-wider" style={{ color: '#1e6b40' }}>Dados do Aluno</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="name">Nome *</Label>
+                <Input id="name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">E-mail</Label>
+                <Input id="email" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Telefone / WhatsApp</Label>
+                <Input id="phone" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>País</Label>
+                <Select value={form.country} onValueChange={v => { if (v) setForm(f => ({ ...f, country: v as 'BR' | 'EU' })) }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BR">🇧🇷 Brasil</SelectItem>
+                    <SelectItem value="EU">🇪🇺 Europa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={form.status} onValueChange={v => { if (v) setForm(f => ({ ...f, status: v as any })) }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ativo">✅ Ativo</SelectItem>
+                    <SelectItem value="suspenso">⏸️ Suspenso</SelectItem>
+                    <SelectItem value="cancelado">❌ Cancelado</SelectItem>
+                    <SelectItem value="experimento">🔍 Experimento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          )}
+            <div className="space-y-2">
+              <Label htmlFor="notes">Observações</Label>
+              <Textarea id="notes" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} />
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Responsável */}
+          <div className="space-y-4">
+            <p className="text-label uppercase tracking-wider" style={{ color: '#1e6b40' }}>Responsável</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="responsible_name">Nome do Responsável</Label>
+                <Input id="responsible_name" value={form.responsible_name} onChange={e => setForm(f => ({ ...f, responsible_name: e.target.value }))} placeholder="Deixe em branco se o aluno é o próprio responsável" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="responsible_phone">WhatsApp do Responsável</Label>
+                <Input id="responsible_phone" value={form.responsible_phone} onChange={e => setForm(f => ({ ...f, responsible_phone: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="responsible_email">E-mail do Responsável</Label>
+                <Input id="responsible_email" type="email" value={form.responsible_email} onChange={e => setForm(f => ({ ...f, responsible_email: e.target.value }))} />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Retorno */}
+          <div className="space-y-4">
+            <p className="text-label uppercase tracking-wider" style={{ color: '#1e6b40' }}>Voltar a Entrar em Contato</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Quando retornar</Label>
+                <Select value={form.follow_up} onValueChange={v => { if (v) setForm(f => ({ ...f, follow_up: v as any })) }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {followUpOptions.map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="follow_up_notes">Motivo / Observação</Label>
+                <Input id="follow_up_notes" value={form.follow_up_notes} onChange={e => setForm(f => ({ ...f, follow_up_notes: e.target.value }))} placeholder="Ex: viagem, aguardando retorno..." />
+              </div>
+            </div>
+          </div>
 
           <div className="flex gap-3 pt-2">
             <Button type="submit" disabled={loading}>

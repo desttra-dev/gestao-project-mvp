@@ -3,30 +3,43 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import Link from 'next/link'
 import { Plus, Pencil } from 'lucide-react'
 
+const statusConfig: Record<string, { label: string; color: string }> = {
+  ativo:       { label: 'Ativo',       color: '#1e6b40' },
+  suspenso:    { label: 'Suspenso',    color: '#b45309' },
+  cancelado:   { label: 'Cancelado',   color: '#b91c1c' },
+  experimento: { label: 'Experimento', color: '#6b7280' },
+}
+
+const followUpLabels: Record<string, string> = {
+  none: '—', next_week: 'Semana que vem',
+  jan: 'Jan', fev: 'Fev', mar: 'Mar', abr: 'Abr', mai: 'Mai', jun: 'Jun',
+  jul: 'Jul', ago: 'Ago', set: 'Set', out: 'Out', nov: 'Nov', dez: 'Dez',
+}
+
 export default async function AlunosPage() {
   const supabase = await createClient()
-  const { data: students } = await supabase
-    .from('students')
-    .select('*')
-    .order('name')
+  const { data: students } = await supabase.from('students').select('*').order('name')
+
+  const ativos = students?.filter(s => s.status === 'ativo').length ?? 0
+  const retornos = students?.filter(s => s.follow_up && s.follow_up !== 'none').length ?? 0
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Alunos</h1>
-          <p className="text-sm text-slate-500 mt-1">{students?.length ?? 0} cadastrados</p>
+          <h1 className="text-h1">Alunos</h1>
+          <p className="text-body mt-1">
+            <span style={{ color: '#1e6b40', fontWeight: 600 }}>{ativos} ativos</span>
+            {retornos > 0 && <> · <span style={{ color: '#b45309', fontWeight: 600 }}>{retornos} com retorno agendado</span></>}
+          </p>
         </div>
         <Link href="/alunos/novo">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Aluno
-          </Button>
+          <Button><Plus className="h-4 w-4 mr-2" />Novo Aluno</Button>
         </Link>
       </div>
 
@@ -36,45 +49,53 @@ export default async function AlunosPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
-                <TableHead>E-mail</TableHead>
-                <TableHead>Telefone</TableHead>
+                <TableHead>Responsável</TableHead>
                 <TableHead>País</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Retorno</TableHead>
                 <TableHead className="w-16"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {(students ?? []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-slate-400 py-12">
+                  <TableCell colSpan={6} className="text-center py-12" style={{ color: '#9dbfa9' }}>
                     Nenhum aluno cadastrado ainda.
                   </TableCell>
                 </TableRow>
               ) : (
-                (students ?? []).map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-medium">{s.name}</TableCell>
-                    <TableCell className="text-slate-500">{s.email ?? '—'}</TableCell>
-                    <TableCell className="text-slate-500">{s.phone ?? '—'}</TableCell>
-                    <TableCell>
-                      <Badge variant={s.country === 'BR' ? 'default' : 'secondary'}>
-                        {s.country === 'BR' ? '🇧🇷 Brasil' : '🇪🇺 Europa'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={s.active ? 'default' : 'outline'}>
-                        {s.active ? 'Ativo' : 'Inativo'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Link href={`/alunos/${s.id}`}>
-                        <Button variant="ghost" size="sm">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))
+                (students ?? []).map((s) => {
+                  const st = statusConfig[s.status ?? 'ativo']
+                  return (
+                    <TableRow key={s.id}>
+                      <TableCell>
+                        <p className="font-semibold" style={{ color: '#0d2e1e' }}>{s.name}</p>
+                        <p className="text-xs" style={{ color: '#6b8c6b' }}>{s.email ?? s.phone ?? ''}</p>
+                      </TableCell>
+                      <TableCell style={{ color: '#4a5a4a' }}>{s.responsible_name ?? '—'}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{s.country === 'BR' ? '🇧🇷 BR' : '🇪🇺 EU'}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: st?.color ?? '#6b7280' }}>
+                          {st?.label ?? s.status}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {s.follow_up && s.follow_up !== 'none' ? (
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: '#fef3c7', color: '#b45309' }}>
+                            {followUpLabels[s.follow_up]}
+                          </span>
+                        ) : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Link href={`/alunos/${s.id}`}>
+                          <Button variant="ghost" size="sm"><Pencil className="h-3.5 w-3.5" /></Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
               )}
             </TableBody>
           </Table>

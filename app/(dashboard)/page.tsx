@@ -2,10 +2,11 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Users, GraduationCap, BookOpen, DollarSign, TrendingUp, AlertCircle, Euro, Banknote } from 'lucide-react'
-import { format } from 'date-fns'
+import { Users, GraduationCap, BookOpen, AlertCircle, Euro, Banknote, PhoneCall } from 'lucide-react'
+import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { DashboardChart } from '@/components/dashboard-chart'
+import Link from 'next/link'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -14,6 +15,7 @@ export default async function DashboardPage() {
   const year = now.getFullYear()
   const periodRef = `${year}-${String(month).padStart(2, '0')}`
 
+  // Busca dados em paralelo
   const [
     { count: totalStudents },
     { count: totalProfessors },
@@ -21,156 +23,151 @@ export default async function DashboardPage() {
     { data: pendingCharges },
     { data: paidChargesMonth },
     { data: pendingPayouts },
+    { data: followUpStudents },
+    { data: allTransactions },
   ] = await Promise.all([
-    supabase.from('students').select('*', { count: 'exact', head: true }).eq('active', true),
+    supabase.from('students').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
     supabase.from('professors').select('*', { count: 'exact', head: true }).eq('active', true),
-    supabase.from('classes').select('id, status').eq('status', 'agendada'),
-    supabase.from('charges').select('id, amount, currency, student:students(name)').eq('status', 'pendente'),
+    supabase.from('classes').select('id').eq('status', 'agendada'),
+    supabase.from('charges').select('id, amount, currency').eq('status', 'pendente'),
     supabase.from('charges').select('amount, currency').eq('status', 'pago').eq('period_reference', periodRef),
-    supabase.from('teacher_payouts').select('amount_brl, professor:professors(name)').eq('status', 'pendente').eq('period_month', month).eq('period_year', year),
+    supabase.from('teacher_payouts').select('amount_brl').eq('status', 'pendente').eq('period_month', month).eq('period_year', year),
+    supabase.from('students').select('id, name, follow_up, follow_up_notes').neq('follow_up', 'none').eq('status', 'ativo'),
+    supabase.from('financial_transactions').select('type, amount, currency, transaction_date').eq('currency', 'BRL').gte('transaction_date', format(subMonths(now, 11), 'yyyy-MM-01')),
   ])
 
+  // Métricas financeiras do mês
   const revenueBRL = (paidChargesMonth ?? []).filter(c => c.currency === 'BRL').reduce((s, c) => s + c.amount, 0)
   const revenueEUR = (paidChargesMonth ?? []).filter(c => c.currency === 'EUR').reduce((s, c) => s + c.amount, 0)
   const totalPayouts = (pendingPayouts ?? []).reduce((s, p) => s + p.amount_brl, 0)
-
   const pendingBRL = (pendingCharges ?? []).filter(c => c.currency === 'BRL').reduce((s, c) => s + c.amount, 0)
   const pendingEUR = (pendingCharges ?? []).filter(c => c.currency === 'EUR').reduce((s, c) => s + c.amount, 0)
 
+  // Monta dados do gráfico — últimos 12 meses
+  const chartData = Array.from({ length: 12 }, (_, i) => {
+    const d = subMonths(now, 11 - i)
+    const key = format(d, 'yyyy-MM')
+    const label = format(d, 'MMM/yy', { locale: ptBR })
+    const monthTransactions = (allTransactions ?? []).filter(t => t.transaction_date.startsWith(key))
+    return {
+      month: label,
+      entradas: monthTransactions.filter(t => t.type === 'entrada').reduce((s, t) => s + t.amount, 0),
+      saidas:   monthTransactions.filter(t => t.type === 'saida').reduce((s, t) => s + t.amount, 0),
+    }
+  })
+
+  // Alunos com retorno pendente
+  const nextWeekStudents = (followUpStudents ?? []).filter(s => s.follow_up === 'next_week')
+  const currentMonthShort = format(now, 'MMM', { locale: ptBR }).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').slice(0, 3)
+  const thisMonthStudents = (followUpStudents ?? []).filter(s => s.follow_up === currentMonthShort)
+
   const monthName = format(now, 'MMMM yyyy', { locale: ptBR })
+  const fmt = (v: number, c = 'BRL') => c === 'EUR'
+    ? `€ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+    : `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-sm text-slate-500 mt-1 capitalize">{monthName}</p>
+        <h1 className="text-h1">Dashboard</h1>
+        <p className="text-body capitalize mt-1">{monthName}</p>
       </div>
 
-      {/* Stats cards */}
+      {/* Cards de métricas */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">Alunos ativos</p>
-                <p className="text-3xl font-bold text-slate-900 mt-1">{totalStudents ?? 0}</p>
+        {[
+          { label: 'Alunos ativos', value: totalStudents ?? 0, icon: Users, bg: '#e8faf0', color: '#1e6b40' },
+          { label: 'Professores', value: totalProfessors ?? 0, icon: GraduationCap, bg: '#e8faf0', color: '#2da862' },
+          { label: 'Aulas agendadas', value: classes?.length ?? 0, icon: BookOpen, bg: '#e8faf0', color: '#0d2e1e' },
+          { label: 'Cobranças pendentes', value: pendingCharges?.length ?? 0, icon: AlertCircle, bg: '#fef3c7', color: '#b45309' },
+        ].map(({ label, value, icon: Icon, bg, color }) => (
+          <Card key={label}>
+            <CardContent className="pt-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-label">{label}</p>
+                  <p className="text-display mt-1" style={{ fontSize: 32, color: '#0d2e1e' }}>{value}</p>
+                </div>
+                <div className="p-3 rounded-full" style={{ backgroundColor: bg }}>
+                  <Icon className="h-5 w-5" style={{ color }} />
+                </div>
               </div>
-              <div className="bg-blue-100 p-3 rounded-full">
-                <Users className="h-5 w-5 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">Professores ativos</p>
-                <p className="text-3xl font-bold text-slate-900 mt-1">{totalProfessors ?? 0}</p>
-              </div>
-              <div className="bg-purple-100 p-3 rounded-full">
-                <GraduationCap className="h-5 w-5 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">Aulas agendadas</p>
-                <p className="text-3xl font-bold text-slate-900 mt-1">{classes?.length ?? 0}</p>
-              </div>
-              <div className="bg-green-100 p-3 rounded-full">
-                <BookOpen className="h-5 w-5 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">Cobranças pendentes</p>
-                <p className="text-3xl font-bold text-slate-900 mt-1">{pendingCharges?.length ?? 0}</p>
-              </div>
-              <div className="bg-orange-100 p-3 rounded-full">
-                <AlertCircle className="h-5 w-5 text-orange-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* Financial summary */}
+      {/* Receita e repasses */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
-              <Banknote className="h-4 w-4" />
-              Recebido no mês (BRL)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-green-600">
-              R$ {revenueBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Banknote className="h-4 w-4" style={{ color: '#1e6b40' }} />
+              <span className="text-label">Recebido no mês (BRL)</span>
+            </div>
+            <p className="text-h2 mt-1" style={{ color: '#1e6b40' }}>{fmt(revenueBRL)}</p>
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
-              <Euro className="h-4 w-4" />
-              Recebido no mês (EUR)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-green-600">
-              € {revenueEUR.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Euro className="h-4 w-4" style={{ color: '#2da862' }} />
+              <span className="text-label">Recebido no mês (EUR)</span>
+            </div>
+            <p className="text-h2 mt-1" style={{ color: '#2da862' }}>{fmt(revenueEUR, 'EUR')}</p>
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Repasses pendentes (BRL)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-orange-600">
-              R$ {totalPayouts.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-            <p className="text-xs text-slate-400 mt-1">{pendingPayouts?.length ?? 0} professor(es)</p>
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-2 mb-1">
+              <AlertCircle className="h-4 w-4" style={{ color: '#b45309' }} />
+              <span className="text-label">Repasses pendentes</span>
+            </div>
+            <p className="text-h2 mt-1" style={{ color: '#b45309' }}>{fmt(totalPayouts)}</p>
+            {pendingBRL > 0 && <p className="text-xs mt-1" style={{ color: '#6b8c6b' }}>Cobranças: {fmt(pendingBRL)}{pendingEUR > 0 ? ` · ${fmt(pendingEUR, 'EUR')}` : ''}</p>}
           </CardContent>
         </Card>
       </div>
 
-      {/* Pending charges detail */}
-      {(pendingCharges?.length ?? 0) > 0 && (
+      {/* Gráfico */}
+      <DashboardChart data12months={chartData} />
+
+      {/* Retornos pendentes */}
+      {((nextWeekStudents?.length ?? 0) + (thisMonthStudents?.length ?? 0)) > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-orange-500" />
-              Cobranças a receber
+            <CardTitle className="text-h2 flex items-center gap-2">
+              <PhoneCall className="h-5 w-5" style={{ color: '#1e6b40' }} />
+              Contatos pendentes
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm text-slate-600 pb-2 border-b">
-                <span className="font-medium">Pendente BRL:</span>
-                <span className="font-bold text-orange-600">R$ {pendingBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+          <CardContent className="space-y-3">
+            {nextWeekStudents.length > 0 && (
+              <div>
+                <p className="text-label mb-2" style={{ color: '#b45309' }}>SEMANA QUE VEM</p>
+                <div className="space-y-1">
+                  {nextWeekStudents.map(s => (
+                    <Link key={s.id} href={`/alunos/${s.id}`} className="flex items-center justify-between p-2 rounded-lg hover:bg-verde-gelo transition-colors">
+                      <p className="text-sm font-semibold" style={{ color: '#0d2e1e' }}>{s.name}</p>
+                      {s.follow_up_notes && <p className="text-xs" style={{ color: '#6b8c6b' }}>{s.follow_up_notes}</p>}
+                    </Link>
+                  ))}
+                </div>
               </div>
-              <div className="flex justify-between text-sm text-slate-600">
-                <span className="font-medium">Pendente EUR:</span>
-                <span className="font-bold text-orange-600">€ {pendingEUR.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            )}
+            {thisMonthStudents.length > 0 && (
+              <div>
+                <p className="text-label mb-2 capitalize" style={{ color: '#1e6b40' }}>ESTE MÊS</p>
+                <div className="space-y-1">
+                  {thisMonthStudents.map(s => (
+                    <Link key={s.id} href={`/alunos/${s.id}`} className="flex items-center justify-between p-2 rounded-lg hover:bg-verde-gelo transition-colors">
+                      <p className="text-sm font-semibold" style={{ color: '#0d2e1e' }}>{s.name}</p>
+                      {s.follow_up_notes && <p className="text-xs" style={{ color: '#6b8c6b' }}>{s.follow_up_notes}</p>}
+                    </Link>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       )}

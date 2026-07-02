@@ -7,6 +7,9 @@ export type ChargeStatus = 'pendente' | 'pago' | 'atrasado' | 'cancelado'
 export type PaymentMethod = 'pix' | 'iban' | 'wise' | 'cora'
 export type PayoutStatus = 'pendente' | 'pago'
 export type EnrollmentStatus = 'ativo' | 'pausado' | 'cancelado'
+export type StudentStatus = 'ativo' | 'suspenso' | 'cancelado' | 'experimento'
+export type FollowUp = 'none' | 'next_week' | 'jan' | 'fev' | 'mar' | 'abr' | 'mai' | 'jun' | 'jul' | 'ago' | 'set' | 'out' | 'nov' | 'dez'
+export type TransactionType = 'entrada' | 'saida'
 
 export interface Professor {
   id: string
@@ -26,6 +29,12 @@ export interface Student {
   country: Country
   notes: string | null
   active: boolean
+  status: StudentStatus
+  responsible_name: string | null
+  responsible_phone: string | null
+  responsible_email: string | null
+  follow_up: FollowUp
+  follow_up_notes: string | null
   created_at: string
 }
 
@@ -107,5 +116,22 @@ export interface TeacherPayout {
   paid_at: string | null
   notes: string | null
   created_at: string
+  professor?: Professor
+}
+
+export interface FinancialTransaction {
+  id: string
+  type: TransactionType
+  amount: number
+  currency: Currency
+  transaction_date: string
+  description: string
+  student_id: string | null
+  responsible_name: string | null
+  professor_id: string | null
+  category: string | null
+  notes: string | null
+  created_at: string
+  student?: Student
   professor?: Professor
 }
