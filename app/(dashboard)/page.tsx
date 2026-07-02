@@ -33,7 +33,7 @@ export default async function DashboardPage() {
     supabase.from('charges').select('amount, currency').eq('status', 'pago').eq('period_reference', periodRef),
     supabase.from('teacher_payouts').select('amount_brl').eq('status', 'pendente').eq('period_month', month).eq('period_year', year),
     supabase.from('students').select('id, name, follow_up, follow_up_notes').neq('follow_up', 'none').eq('status', 'ativo'),
-    supabase.from('financial_transactions').select('type, amount, currency, transaction_date').eq('currency', 'BRL').gte('transaction_date', format(subMonths(now, 11), 'yyyy-MM-01')),
+    supabase.from('financial_transactions').select('type, amount, currency, transaction_date').gte('transaction_date', format(subMonths(now, 11), 'yyyy-MM-01')),
   ])
 
   // Métricas financeiras do mês
@@ -43,18 +43,22 @@ export default async function DashboardPage() {
   const pendingBRL = (pendingCharges ?? []).filter(c => c.currency === 'BRL').reduce((s, c) => s + c.amount, 0)
   const pendingEUR = (pendingCharges ?? []).filter(c => c.currency === 'EUR').reduce((s, c) => s + c.amount, 0)
 
-  // Monta dados do gráfico — últimos 12 meses
-  const chartData = Array.from({ length: 12 }, (_, i) => {
-    const d = subMonths(now, 11 - i)
-    const key = format(d, 'yyyy-MM')
-    const label = format(d, 'MMM/yy', { locale: ptBR })
-    const monthTransactions = (allTransactions ?? []).filter(t => t.transaction_date.startsWith(key))
-    return {
-      month: label,
-      entradas: monthTransactions.filter(t => t.type === 'entrada').reduce((s, t) => s + t.amount, 0),
-      saidas:   monthTransactions.filter(t => t.type === 'saida').reduce((s, t) => s + t.amount, 0),
-    }
-  })
+  // Monta dados dos gráficos — últimos 12 meses
+  const buildChartData = (currency: string) =>
+    Array.from({ length: 12 }, (_, i) => {
+      const d = subMonths(now, 11 - i)
+      const key = format(d, 'yyyy-MM')
+      const label = format(d, 'MMM/yy', { locale: ptBR })
+      const monthTx = (allTransactions ?? []).filter(t => t.transaction_date.startsWith(key) && t.currency === currency)
+      return {
+        month: label,
+        entradas: monthTx.filter(t => t.type === 'entrada').reduce((s, t) => s + t.amount, 0),
+        saidas:   monthTx.filter(t => t.type === 'saida').reduce((s, t) => s + t.amount, 0),
+      }
+    })
+
+  const chartDataBRL = buildChartData('BRL')
+  const chartDataEUR = buildChartData('EUR')
 
   // Alunos com retorno pendente
   const nextWeekStudents = (followUpStudents ?? []).filter(s => s.follow_up === 'next_week')
@@ -129,8 +133,9 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* Gráfico */}
-      <DashboardChart data12months={chartData} />
+      {/* Gráficos */}
+      <DashboardChart data12months={chartDataBRL} currency="BRL" />
+      <DashboardChart data12months={chartDataEUR} currency="EUR" />
 
       {/* Retornos pendentes */}
       {((nextWeekStudents?.length ?? 0) + (thisMonthStudents?.length ?? 0)) > 0 && (
