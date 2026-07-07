@@ -38,12 +38,14 @@ interface ClassItem {
 }
 
 interface AulasViewProps {
-  classes: ClassItem[]      // página atual (lista)
-  allClasses: ClassItem[]   // todas (calendário)
+  classes: ClassItem[]
+  allClasses: ClassItem[]
   page: number
   totalPages: number
   total: number
   periodo: string
+  professors: { id: string; name: string }[]
+  professorId: string
 }
 
 const PERIODOS = [
@@ -52,12 +54,18 @@ const PERIODOS = [
   { key: 'tudo',     label: 'Tudo'     },
 ]
 
-export function AulasView({ classes, allClasses, page, totalPages, total, periodo }: AulasViewProps) {
+export function AulasView({ classes, allClasses, page, totalPages, total, periodo, professors, professorId }: AulasViewProps) {
   const [view, setView] = useState<'lista' | 'calendario'>('lista')
   const router = useRouter()
 
-  const prevHref = `?periodo=${periodo}&page=${page - 1}`
-  const nextHref = `?periodo=${periodo}&page=${page + 1}`
+  const buildHref = (params: Record<string, string>) => {
+    const p = new URLSearchParams({ periodo, page: String(page), ...(professorId ? { professor_id: professorId } : {}) })
+    Object.entries(params).forEach(([k, v]) => v ? p.set(k, v) : p.delete(k))
+    return `?${p.toString()}`
+  }
+
+  const prevHref = buildHref({ page: String(page - 1) })
+  const nextHref = buildHref({ page: String(page + 1) })
 
   return (
     <div className="space-y-4">
@@ -90,24 +98,42 @@ export function AulasView({ classes, allClasses, page, totalPages, total, period
           </button>
         </div>
 
-        {view === 'lista' && (
-          <div className="flex gap-1 p-1 rounded-lg" style={{ backgroundColor: '#f5f7f5', border: '1px solid #d4e8d4' }}>
-            {PERIODOS.map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => router.push(`?periodo=${key}&page=1`)}
-                className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
-                style={{
-                  backgroundColor: periodo === key ? 'white' : 'transparent',
-                  color:           periodo === key ? '#1e6b40' : '#6b8c6b',
-                  boxShadow:       periodo === key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Filtro de professor */}
+          {professors.length > 0 && (
+            <select
+              value={professorId}
+              onChange={e => router.push(buildHref({ professor_id: e.target.value, page: '1' }))}
+              className="rounded-lg px-3 py-1.5 text-sm font-medium"
+              style={{ backgroundColor: '#f5f7f5', border: '1px solid #d4e8d4', color: professorId ? '#1e6b40' : '#6b8c6b', outline: 'none' }}
+            >
+              <option value="">Todos os professores</option>
+              {professors.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Filtro de período — só na lista */}
+          {view === 'lista' && (
+            <div className="flex gap-1 p-1 rounded-lg" style={{ backgroundColor: '#f5f7f5', border: '1px solid #d4e8d4' }}>
+              {PERIODOS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => router.push(buildHref({ periodo: key, page: '1' }))}
+                  className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
+                  style={{
+                    backgroundColor: periodo === key ? 'white' : 'transparent',
+                    color:           periodo === key ? '#1e6b40' : '#6b8c6b',
+                    boxShadow:       periodo === key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {view === 'calendario' ? (

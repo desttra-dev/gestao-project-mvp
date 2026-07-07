@@ -12,9 +12,9 @@ const PAGE_SIZE = 50
 export default async function AulasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; periodo?: string }>
+  searchParams: Promise<{ page?: string; periodo?: string; professor_id?: string }>
 }) {
-  const { page = '1', periodo = 'proximas' } = await searchParams
+  const { page = '1', periodo = 'proximas', professor_id } = await searchParams
   const pageNum = Math.max(1, parseInt(page))
   const from    = (pageNum - 1) * PAGE_SIZE
   const to      = from + PAGE_SIZE - 1
@@ -26,6 +26,8 @@ export default async function AulasPage({
   let listQuery = supabase
     .from('classes')
     .select('*, student:students(name), professor:professors(name)', { count: 'exact' })
+
+  if (professor_id) listQuery = listQuery.eq('teacher_id', professor_id)
 
   if (periodo === 'proximas') {
     listQuery = listQuery.gte('scheduled_at', hoje).order('scheduled_at', { ascending: true })
@@ -44,9 +46,12 @@ export default async function AulasPage({
     .order('scheduled_at', { ascending: true })
     .limit(500)
 
-  const [{ data: classes, count }, { data: allClasses }] = await Promise.all([
+  if (professor_id) calQuery = calQuery.eq('teacher_id', professor_id)
+
+  const [{ data: classes, count }, { data: allClasses }, { data: professors }] = await Promise.all([
     listQuery,
     calQuery,
+    supabase.from('professors').select('id, name').eq('active', true).order('name'),
   ])
 
   const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE)
@@ -85,6 +90,8 @@ export default async function AulasPage({
         totalPages={totalPages}
         total={count ?? 0}
         periodo={periodo}
+        professors={professors ?? []}
+        professorId={professor_id ?? ''}
       />
     </div>
   )
