@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import type { Student, Professor, Enrollment, Class } from '@/lib/types'
-import { createAulaGoogleEvent } from '@/app/actions/aulas'
+import { createAulaGoogleEvent, notifyProfessorNewAulas } from '@/app/actions/aulas'
 import { addDays, addWeeks, addHours, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { CalendarDays, Calendar } from 'lucide-react'
@@ -208,13 +208,29 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
     setLoading(false)
     if (error) { toast.error('Erro ao registrar: ' + error.message); return }
 
+    const selectedProf  = professors.find(p => p.id === form.teacher_id)
     const studentName   = students.find(s => s.id === form.student_id)?.name ?? 'Aluno'
-    const professorName = professors.find(p => p.id === form.teacher_id)?.name ?? 'Prof'
+    const professorName = selectedProf?.name ?? 'Prof'
     toast.success(dates.length > 1 ? `${dates.length} aulas registradas!` : 'Aula registrada!')
 
     dates.forEach(d => {
       createAulaGoogleEvent({ studentName, professorName, scheduledAt: d.toISOString(), level: form.level, notes: form.notes }).catch(() => {})
     })
+
+    if (selectedProf?.email) {
+      notifyProfessorNewAulas({
+        professorEmail: selectedProf.email,
+        professorName,
+        studentName,
+        level: form.level,
+        subject: form.subject || null,
+        notes: form.notes || null,
+        dates: dates.map(d => ({
+          scheduledAt: d.toISOString(),
+          endsAt: computeEndsAt(d.toISOString(), form.ends_at_time),
+        })),
+      }).catch(() => {})
+    }
 
     router.push('/aulas')
     router.refresh()
