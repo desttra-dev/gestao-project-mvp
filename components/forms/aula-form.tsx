@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import type { Student, Professor, Enrollment } from '@/lib/types'
+import { createAulaGoogleEvent } from '@/app/actions/aulas'
 
 interface AulaFormProps {
   students: Student[]
@@ -60,6 +61,16 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
     }
 
     toast.success('Aula registrada!')
+
+    // Google Calendar — non-blocking, failure doesn't affect the save
+    createAulaGoogleEvent({
+      studentName: students.find(s => s.id === form.student_id)?.name ?? 'Aluno',
+      professorName: professors.find(p => p.id === form.teacher_id)?.name ?? 'Prof',
+      scheduledAt: form.scheduled_at,
+      level: form.level,
+      notes: form.notes,
+    }).catch(() => {})
+
     router.push('/aulas')
     router.refresh()
   }
