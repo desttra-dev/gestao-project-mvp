@@ -86,6 +86,7 @@ export interface Class {
   status: ClassStatus
   price: number | null
   notes: string | null
+  series_id: string | null
   created_at: string
   student?: Student
   professor?: Professor
