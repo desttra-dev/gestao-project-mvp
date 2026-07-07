@@ -139,14 +139,22 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
 
       if (err2) { setLoading(false); toast.error('Erro: ' + err2.message); return }
 
-      // 3. Update each following class preserving its date, adjusting ends_at
+      // 3. Update each following class: keep their DATE, apply the new TIME from current edit
       if (following && following.length > 0) {
-        const updates = following.map(c => ({
-          id: c.id,
-          ...basePayload,
-          scheduled_at: c.scheduled_at,
-          ends_at: computeEndsAt(c.scheduled_at, form.ends_at_time),
-        }))
+        const newHour   = startDt.getHours()
+        const newMinute = startDt.getMinutes()
+
+        const updates = following.map(c => {
+          // Keep original date, swap to new time of day
+          const newStart = new Date(c.scheduled_at)
+          newStart.setHours(newHour, newMinute, 0, 0)
+          return {
+            id: c.id,
+            ...basePayload,
+            scheduled_at: newStart.toISOString(),
+            ends_at: computeEndsAt(newStart.toISOString(), form.ends_at_time),
+          }
+        })
 
         const { error: err3 } = await supabase.from('classes').upsert(updates, { onConflict: 'id' })
         if (err3) { setLoading(false); toast.error('Erro: ' + err3.message); return }
