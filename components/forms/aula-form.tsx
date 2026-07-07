@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import type { Student, Professor, Enrollment, Class } from '@/lib/types'
-import { createAulaGoogleEvent, notifyProfessorNewAulas } from '@/app/actions/aulas'
+import { createAulaGoogleEvent, notifyProfessorNewAulas, setupAulaZoom } from '@/app/actions/aulas'
 import { addDays, addWeeks, addHours, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { CalendarDays, Calendar } from 'lucide-react'
@@ -204,13 +204,18 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
       series_id:     seriesId,
     }))
 
-    const { error } = await supabase.from('classes').insert(payloads)
+    const { data: inserted, error } = await supabase
+      .from('classes')
+      .insert(payloads)
+      .select('id, scheduled_at, ends_at')
+
     setLoading(false)
     if (error) { toast.error('Erro ao registrar: ' + error.message); return }
 
-    const selectedProf  = professors.find(p => p.id === form.teacher_id)
-    const studentName   = students.find(s => s.id === form.student_id)?.name ?? 'Aluno'
-    const professorName = selectedProf?.name ?? 'Prof'
+    const selectedProf    = professors.find(p => p.id === form.teacher_id)
+    const selectedStudent = students.find(s => s.id === form.student_id)
+    const studentName     = selectedStudent?.name ?? 'Aluno'
+    const professorName   = selectedProf?.name ?? 'Prof'
     toast.success(dates.length > 1 ? `${dates.length} aulas registradas!` : 'Aula registrada!')
 
     dates.forEach(d => {
@@ -229,6 +234,42 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
           scheduledAt: d.toISOString(),
           endsAt: computeEndsAt(d.toISOString(), form.ends_at_time),
         })),
+      }).catch(() => {})
+    }
+
+    if (inserted && inserted.length > 0) {
+      // Duração em minutos (fallback 60)
+      let durationMinutes = 60
+      if (form.ends_at_time && form.scheduled_at) {
+        const start = new Date(form.scheduled_at)
+        const [h, m] = form.ends_at_time.split(':').map(Number)
+        const end = new Date(form.scheduled_at)
+        end.setHours(h, m, 0, 0)
+        const mins = Math.round((end.getTime() - start.getTime()) / 60000)
+        if (mins > 0) durationMinutes = mins
+      }
+
+      const subjectLabel = form.subject
+        ? ({ matematica: 'Matemática', fisica: 'Física', quimica: 'Química', portugues: 'Português', historia: 'História', geografia: 'Geografia', filosofia: 'Filosofia', redacao: 'Redação', sociologia: 'Sociologia' }[form.subject] ?? form.subject)
+        : null
+      const levelLabel = { fundamental: 'Fundamental', medio: 'Médio', superior: 'Superior', internacional: 'Internacional' }[form.level] ?? form.level
+      const topic = subjectLabel
+        ? `Aula de ${subjectLabel} (${levelLabel}) — ${studentName}`
+        : `Aula ${levelLabel} — ${studentName}`
+
+      setupAulaZoom({
+        classes: inserted.map(c => ({ id: c.id, scheduledAt: c.scheduled_at, endsAt: c.ends_at ?? null })),
+        repeatMode: form.repeat,
+        repeatUntil: form.repeat_until || undefined,
+        durationMinutes,
+        topic,
+        professorEmail: selectedProf?.email ?? null,
+        professorName,
+        studentName,
+        studentEmail: selectedStudent?.email ?? null,
+        responsibleEmail: selectedStudent?.responsible_email ?? null,
+        subject: form.subject || null,
+        level: form.level,
       }).catch(() => {})
     }
 

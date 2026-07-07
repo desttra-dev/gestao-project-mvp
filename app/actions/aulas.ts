@@ -2,6 +2,7 @@
 
 import { createCalendarEvent } from '@/lib/google-calendar'
 import { sendEmail } from '@/lib/email'
+import { createZoomMeeting } from '@/lib/zoom'
 import { createClient } from '@/lib/supabase/server'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -132,6 +133,187 @@ export async function notifyProfessorNewAulas({
 </html>`
 
   await sendEmail({ to: professorEmail, subject: subject_line, html })
+}
+
+export async function setupAulaZoom({
+  classes,
+  repeatMode,
+  repeatUntil,
+  durationMinutes,
+  topic,
+  professorEmail,
+  professorName,
+  studentName,
+  studentEmail,
+  responsibleEmail,
+  subject,
+  level,
+}: {
+  classes: { id: string; scheduledAt: string; endsAt: string | null }[]
+  repeatMode: 'none' | 'daily' | 'weekly'
+  repeatUntil?: string
+  durationMinutes: number
+  topic: string
+  professorEmail?: string | null
+  professorName: string
+  studentName: string
+  studentEmail?: string | null
+  responsibleEmail?: string | null
+  subject?: string | null
+  level: string
+}) {
+  const meeting = await createZoomMeeting({
+    topic,
+    scheduledAt: classes[0].scheduledAt,
+    durationMinutes,
+    repeatMode,
+    repeatUntil,
+  })
+  if (!meeting) return
+
+  // Persiste zoom_join_url em todas as aulas da série
+  const supabase = await createClient()
+  await supabase.from('classes').upsert(
+    classes.map(c => ({ id: c.id, zoom_meeting_id: meeting.meetingId, zoom_join_url: meeting.joinUrl })),
+    { onConflict: 'id' }
+  )
+
+  const isSeries    = classes.length > 1
+  const levelLabel  = levelLabels[level]  ?? level
+  const subjectLabel = subject ? (subjectLabels[subject] ?? subject) : null
+
+  const dateRows = classes.map((c, i) => {
+    const start    = new Date(c.scheduledAt)
+    const dateStr  = format(start, "EEEE, dd/MM/yyyy", { locale: ptBR })
+    const startHr  = format(start, 'HH:mm')
+    const endHr    = c.endsAt ? format(new Date(c.endsAt), 'HH:mm') : null
+    const timeStr  = endHr ? `${startHr} – ${endHr}` : startHr
+    return `
+      <tr style="border-bottom:1px solid #e8f0e8;">
+        <td style="padding:7px 12px;color:#4a5a4a;font-size:13px;">${i + 1}.</td>
+        <td style="padding:7px 12px;color:#0d2e1e;font-size:13px;text-transform:capitalize;">${dateStr}</td>
+        <td style="padding:7px 12px;color:#1e6b40;font-size:13px;font-weight:600;">${timeStr}</td>
+      </tr>`
+  }).join('')
+
+  const zoomButton = `
+    <a href="${meeting.joinUrl}" target="_blank"
+       style="display:inline-block;background:#2D8CFF;color:white;text-decoration:none;
+              padding:12px 28px;border-radius:8px;font-size:15px;font-weight:700;margin:8px 0;">
+      Entrar no Zoom
+    </a>
+    <p style="margin:6px 0 0;color:#9dbfa9;font-size:11px;">
+      Link permanente — funciona para ${isSeries ? 'todas as aulas desta série' : 'esta aula'}
+    </p>`
+
+  const detailsBlock = `
+    <table width="100%" cellpadding="0" cellspacing="0"
+           style="background:#f5f7f5;border-radius:8px;padding:16px;margin-bottom:24px;">
+      <tr>
+        <td style="padding:4px 0;color:#6b8c6b;font-size:13px;width:100px;">Aluno</td>
+        <td style="padding:4px 0;color:#0d2e1e;font-size:13px;font-weight:600;">${studentName}</td>
+      </tr>
+      <tr>
+        <td style="padding:4px 0;color:#6b8c6b;font-size:13px;">Professor</td>
+        <td style="padding:4px 0;color:#0d2e1e;font-size:13px;">${professorName}</td>
+      </tr>
+      <tr>
+        <td style="padding:4px 0;color:#6b8c6b;font-size:13px;">Nível</td>
+        <td style="padding:4px 0;color:#0d2e1e;font-size:13px;">${levelLabel}</td>
+      </tr>
+      ${subjectLabel ? `
+      <tr>
+        <td style="padding:4px 0;color:#6b8c6b;font-size:13px;">Matéria</td>
+        <td style="padding:4px 0;color:#0d2e1e;font-size:13px;">${subjectLabel}</td>
+      </tr>` : ''}
+    </table>`
+
+  const datesBlock = `
+    <p style="margin:0 0 10px;color:#0d2e1e;font-size:14px;font-weight:600;">
+      ${isSeries ? 'Datas agendadas' : 'Data e horário'}
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0"
+           style="border:1px solid #d4e8d4;border-radius:8px;overflow:hidden;margin-bottom:24px;">
+      ${dateRows}
+    </table>`
+
+  const footer = `
+    <tr>
+      <td style="padding:16px 32px;border-top:1px solid #e8f0e8;background:#fafcfa;">
+        <p style="margin:0;color:#9dbfa9;font-size:11px;">
+          Email automático da plataforma Desttra. Dúvidas: gestao@desttra.com
+        </p>
+      </td>
+    </tr>`
+
+  const buildHtml = (greeting: string, intro: string) => `
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;background:#f5f7f5;font-family:sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7f5;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="560" cellpadding="0" cellspacing="0"
+           style="background:white;border-radius:12px;overflow:hidden;border:1px solid #d4e8d4;">
+      <tr>
+        <td style="background:#1e6b40;padding:24px 32px;">
+          <p style="margin:0;color:white;font-size:20px;font-weight:700;">Desttra Educação</p>
+          <p style="margin:4px 0 0;color:#a7d4b8;font-size:13px;">Reunião Zoom agendada</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:28px 32px;">
+          <p style="margin:0 0 6px;color:#6b8c6b;font-size:13px;">${greeting}</p>
+          <p style="margin:0 0 24px;color:#0d2e1e;font-size:15px;line-height:1.5;">${intro}</p>
+          ${detailsBlock}
+          ${datesBlock}
+          <div style="text-align:center;padding:8px 0 16px;">${zoomButton}</div>
+        </td>
+      </tr>
+      ${footer}
+    </table>
+  </td></tr>
+</table>
+</body></html>`
+
+  const emailSubject = isSeries
+    ? `Zoom agendado — ${classes.length} aulas com ${studentName}`
+    : `Zoom agendado — aula com ${studentName}`
+
+  const promises: Promise<unknown>[] = []
+
+  if (professorEmail) {
+    promises.push(sendEmail({
+      to: professorEmail,
+      subject: emailSubject,
+      html: buildHtml(
+        `Olá, <strong style="color:#0d2e1e;">${professorName}</strong>`,
+        isSeries
+          ? `A série de <strong>${classes.length} aulas</strong> com o aluno <strong>${studentName}</strong> foi agendada com reunião Zoom criada automaticamente.`
+          : `A aula com o aluno <strong>${studentName}</strong> foi agendada com reunião Zoom criada automaticamente.`,
+      ),
+    }))
+  }
+
+  const recipientEmail = studentEmail || responsibleEmail
+  if (recipientEmail) {
+    const greeting = responsibleEmail && !studentEmail
+      ? `Olá, responsável de <strong style="color:#0d2e1e;">${studentName}</strong>`
+      : `Olá, <strong style="color:#0d2e1e;">${studentName}</strong>`
+
+    promises.push(sendEmail({
+      to: recipientEmail,
+      subject: isSeries
+        ? `Zoom agendado — ${classes.length} aulas com ${professorName}`
+        : `Zoom agendado — aula com ${professorName}`,
+      html: buildHtml(
+        greeting,
+        isSeries
+          ? `Uma série de <strong>${classes.length} aulas</strong> foi agendada com o professor <strong>${professorName}</strong>.`
+          : `Sua aula com o professor <strong>${professorName}</strong> foi agendada.`,
+      ),
+    }))
+  }
+
+  await Promise.allSettled(promises)
 }
 
 export async function cancelAulaComEmail(aulaId: string): Promise<{ error: string | null }> {
