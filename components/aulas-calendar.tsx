@@ -11,11 +11,18 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
+const subjectLabels: Record<string, string> = {
+  matematica: 'Matemática', fisica: 'Física', quimica: 'Química', portugues: 'Português',
+  historia: 'História', geografia: 'Geografia', filosofia: 'Filosofia',
+  redacao: 'Redação', sociologia: 'Sociologia',
+}
+
 interface ClassItem {
   id: string
   scheduled_at: string
   status: string
   level: string
+  subject?: string | null
   student: { name: string } | null
   professor: { name: string } | null
 }
@@ -165,6 +172,7 @@ export function AulasCalendar({ classes }: { classes: ClassItem[] }) {
                     </p>
                     <p className="text-xs" style={{ color: '#6b8c6b' }}>
                       Prof. {c.professor?.name ?? '—'} · {levelLabels[c.level] ?? c.level}
+                      {c.subject ? ` · ${subjectLabels[c.subject] ?? c.subject}` : ''}
                     </p>
                   </div>
                   <Badge variant="outline" style={{ fontSize: '0.7rem' }}>

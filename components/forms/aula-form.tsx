@@ -49,6 +49,7 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
     enrollment_id: '',
     scheduled_at: '',
     level: 'fundamental' as string,
+    subject: '',
     notes: '',
     repeat: 'none' as RepeatMode,
     repeat_until: '',
@@ -76,6 +77,7 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
       enrollment_id: form.enrollment_id || null,
       scheduled_at: d.toISOString(),
       level: form.level,
+      subject: form.subject || null,
       status: 'agendada',
       notes: form.notes || null,
     }))
@@ -200,6 +202,30 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
                 <SelectItem value="medio">Médio (R$45 repasse)</SelectItem>
                 <SelectItem value="superior">Superior (R$50 repasse)</SelectItem>
                 <SelectItem value="internacional">Internacional (R$50 repasse)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Matéria</Label>
+            <Select
+              value={form.subject}
+              onValueChange={v => setForm(f => ({ ...f, subject: v === 'none' ? '' : (v ?? '') }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a matéria (opcional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— Sem matéria —</SelectItem>
+                <SelectItem value="matematica">Matemática</SelectItem>
+                <SelectItem value="fisica">Física</SelectItem>
+                <SelectItem value="quimica">Química</SelectItem>
+                <SelectItem value="portugues">Português</SelectItem>
+                <SelectItem value="historia">História</SelectItem>
+                <SelectItem value="geografia">Geografia</SelectItem>
+                <SelectItem value="filosofia">Filosofia</SelectItem>
+                <SelectItem value="redacao">Redação</SelectItem>
+                <SelectItem value="sociologia">Sociologia</SelectItem>
               </SelectContent>
             </Select>
           </div>

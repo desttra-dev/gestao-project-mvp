@@ -2,6 +2,7 @@ export type Country = 'BR' | 'PT' | 'DE' | 'FR' | 'ES' | 'IT' | 'NL' | 'BE' | 'A
 export type Currency = 'BRL' | 'EUR' | 'GBP' | 'CHF' | 'USD' | 'CAD' | 'SEK' | 'NOK' | 'DKK'
 export type PlanType = 'avulsa' | 'weekly_1x' | 'weekly_2x' | 'weekly_3x' | 'custom'
 export type ClassLevel = 'fundamental' | 'medio' | 'superior' | 'internacional'
+export type ClassSubject = 'matematica' | 'fisica' | 'quimica' | 'portugues' | 'historia' | 'geografia' | 'filosofia' | 'redacao' | 'sociologia'
 export type ClassStatus = 'agendada' | 'realizada' | 'cancelada'
 export type ChargeStatus = 'pendente' | 'pago' | 'atrasado' | 'cancelado'
 export type PaymentMethod = 'pix' | 'iban' | 'wise' | 'cora'
@@ -80,6 +81,7 @@ export interface Class {
   teacher_id: string
   scheduled_at: string
   level: ClassLevel
+  subject: ClassSubject | null
   status: ClassStatus
   notes: string | null
   created_at: string

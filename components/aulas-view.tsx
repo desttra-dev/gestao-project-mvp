@@ -15,6 +15,12 @@ const levelLabels: Record<string, string> = {
   fundamental: 'Fundamental', medio: 'Médio', superior: 'Superior', internacional: 'Internacional',
 }
 
+const subjectLabels: Record<string, string> = {
+  matematica: 'Matemática', fisica: 'Física', quimica: 'Química', portugues: 'Português',
+  historia: 'História', geografia: 'Geografia', filosofia: 'Filosofia',
+  redacao: 'Redação', sociologia: 'Sociologia',
+}
+
 const statusBadge: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   agendada: 'default', realizada: 'secondary', cancelada: 'destructive',
 }
@@ -24,6 +30,7 @@ interface ClassItem {
   scheduled_at: string
   status: string
   level: string
+  subject?: string | null
   notes?: string | null
   student: { name: string } | null
   professor: { name: string } | null
@@ -73,6 +80,7 @@ export function AulasView({ classes }: { classes: ClassItem[] }) {
                   <TableHead>Data / Hora</TableHead>
                   <TableHead>Aluno</TableHead>
                   <TableHead>Professor</TableHead>
+                  <TableHead>Matéria</TableHead>
                   <TableHead>Nível</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-24"></TableHead>
@@ -93,6 +101,9 @@ export function AulasView({ classes }: { classes: ClassItem[] }) {
                       </TableCell>
                       <TableCell style={{ color: '#0d2e1e' }}>{c.student?.name ?? '—'}</TableCell>
                       <TableCell style={{ color: '#6b8c6b' }}>{c.professor?.name ?? '—'}</TableCell>
+                      <TableCell style={{ color: '#4a5a4a' }}>
+                        {c.subject ? subjectLabels[c.subject] ?? c.subject : '—'}
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline">{levelLabels[c.level] ?? c.level}</Badge>
                       </TableCell>
