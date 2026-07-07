@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { CalendarDays, List } from 'lucide-react'
+import { CalendarDays, List, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -14,13 +15,11 @@ import { AulaActions } from '@/app/(dashboard)/aulas/aula-actions'
 const levelLabels: Record<string, string> = {
   fundamental: 'Fundamental', medio: 'Médio', superior: 'Superior', internacional: 'Internacional',
 }
-
 const subjectLabels: Record<string, string> = {
   matematica: 'Matemática', fisica: 'Física', quimica: 'Química', portugues: 'Português',
   historia: 'História', geografia: 'Geografia', filosofia: 'Filosofia',
   redacao: 'Redação', sociologia: 'Sociologia',
 }
-
 const statusBadge: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   agendada: 'default', realizada: 'secondary', cancelada: 'destructive',
 }
@@ -28,6 +27,7 @@ const statusBadge: Record<string, 'default' | 'secondary' | 'destructive' | 'out
 interface ClassItem {
   id: string
   scheduled_at: string
+  ends_at?: string | null
   status: string
   level: string
   subject?: string | null
@@ -36,12 +36,30 @@ interface ClassItem {
   professor: { name: string } | null
 }
 
-export function AulasView({ classes }: { classes: ClassItem[] }) {
+interface AulasViewProps {
+  classes: ClassItem[]      // página atual (lista)
+  allClasses: ClassItem[]   // todas (calendário)
+  page: number
+  totalPages: number
+  total: number
+  periodo: string
+}
+
+const periodoLabel: Record<string, string> = {
+  proximas: 'Próximas',
+  passadas: 'Passadas',
+  tudo:     'Todas',
+}
+
+export function AulasView({ classes, allClasses, page, totalPages, total, periodo }: AulasViewProps) {
   const [view, setView] = useState<'lista' | 'calendario'>('lista')
+
+  const prevHref = `?periodo=${periodo}&page=${page - 1}`
+  const nextHref = `?periodo=${periodo}&page=${page + 1}`
 
   return (
     <div className="space-y-4">
-      {/* Toggle */}
+      {/* Toggle lista / calendário */}
       <div className="flex gap-1 p-1 rounded-lg w-fit" style={{ backgroundColor: '#f5f7f5', border: '1px solid #d4e8d4' }}>
         <button
           onClick={() => setView('lista')}
@@ -70,58 +88,137 @@ export function AulasView({ classes }: { classes: ClassItem[] }) {
       </div>
 
       {view === 'calendario' ? (
-        <AulasCalendar classes={classes} />
+        <AulasCalendar classes={allClasses} />
       ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Data / Hora</TableHead>
-                  <TableHead>Aluno</TableHead>
-                  <TableHead>Professor</TableHead>
-                  <TableHead>Matéria</TableHead>
-                  <TableHead>Nível</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-24"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {classes.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12" style={{ color: '#9dbfa9' }}>
-                      Nenhuma aula registrada ainda.
-                    </TableCell>
-                  </TableRow>
+        <>
+          {/* Info + paginação topo */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm" style={{ color: '#6b8c6b' }}>
+              {periodoLabel[periodo] ?? periodo} · {total} aula{total !== 1 ? 's' : ''}
+              {totalPages > 1 && ` · página ${page} de ${totalPages}`}
+            </p>
+
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                {page > 1 ? (
+                  <Link href={prevHref}>
+                    <Button variant="ghost" size="sm">
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                  </Link>
                 ) : (
-                  classes.map(c => (
-                    <TableRow key={c.id}>
-                      <TableCell className="font-medium whitespace-nowrap" style={{ color: '#0d2e1e' }}>
-                        {format(new Date(c.scheduled_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
-                      </TableCell>
-                      <TableCell style={{ color: '#0d2e1e' }}>{c.student?.name ?? '—'}</TableCell>
-                      <TableCell style={{ color: '#6b8c6b' }}>{c.professor?.name ?? '—'}</TableCell>
-                      <TableCell style={{ color: '#4a5a4a' }}>
-                        {c.subject ? subjectLabels[c.subject] ?? c.subject : '—'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{levelLabels[c.level] ?? c.level}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={statusBadge[c.status] ?? 'outline'}>
-                          {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <AulaActions aulaId={c.id} status={c.status} />
+                  <Button variant="ghost" size="sm" disabled>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                )}
+                <span className="text-sm px-2" style={{ color: '#4a5a4a' }}>
+                  {page} / {totalPages}
+                </span>
+                {page < totalPages ? (
+                  <Link href={nextHref}>
+                    <Button variant="ghost" size="sm">
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button variant="ghost" size="sm" disabled>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Tabela */}
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data / Hora</TableHead>
+                    <TableHead>Aluno</TableHead>
+                    <TableHead>Professor</TableHead>
+                    <TableHead>Matéria</TableHead>
+                    <TableHead>Nível</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-16"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {classes.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-12" style={{ color: '#9dbfa9' }}>
+                        Nenhuma aula neste período.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                  ) : (
+                    classes.map(c => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium whitespace-nowrap" style={{ color: '#0d2e1e' }}>
+                          {format(new Date(c.scheduled_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                          {c.ends_at && (
+                            <span className="text-xs ml-1" style={{ color: '#6b8c6b' }}>
+                              – {format(new Date(c.ends_at), 'HH:mm')}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell style={{ color: '#0d2e1e' }}>{c.student?.name ?? '—'}</TableCell>
+                        <TableCell style={{ color: '#6b8c6b' }}>{c.professor?.name ?? '—'}</TableCell>
+                        <TableCell style={{ color: '#4a5a4a' }}>
+                          {c.subject ? subjectLabels[c.subject] ?? c.subject : '—'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{levelLabels[c.level] ?? c.level}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={statusBadge[c.status] ?? 'outline'}>
+                            {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <AulaActions aulaId={c.id} status={c.status} />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Paginação rodapé */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-2">
+              {page > 1 ? (
+                <Link href={prevHref}>
+                  <Button variant="outline" size="sm">
+                    <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                  </Button>
+                </Link>
+              ) : (
+                <Button variant="outline" size="sm" disabled>
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                </Button>
+              )}
+
+              <span className="text-sm" style={{ color: '#6b8c6b' }}>
+                Página {page} de {totalPages}
+              </span>
+
+              {page < totalPages ? (
+                <Link href={nextHref}>
+                  <Button variant="outline" size="sm">
+                    Próxima <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </Link>
+              ) : (
+                <Button variant="outline" size="sm" disabled>
+                  Próxima <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

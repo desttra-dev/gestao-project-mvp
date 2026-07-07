@@ -3,19 +3,63 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { AulasView } from '@/components/aulas-view'
+import { AulasFiltros } from '@/components/ui/aulas-filtros'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
+import { Suspense } from 'react'
+import { format } from 'date-fns'
 
-export default async function AulasPage() {
+const PAGE_SIZE = 50
+
+export default async function AulasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; periodo?: string }>
+}) {
+  const { page = '1', periodo = 'proximas' } = await searchParams
+  const pageNum = Math.max(1, parseInt(page))
+  const from    = (pageNum - 1) * PAGE_SIZE
+  const to      = from + PAGE_SIZE - 1
+
   const supabase = await createClient()
-  const { data: classes } = await supabase
+  const hoje     = format(new Date(), "yyyy-MM-dd'T'00:00:00")
+
+  // ── Query paginada (para a lista) ─────────────────────────────────────────
+  let listQuery = supabase
+    .from('classes')
+    .select('*, student:students(name), professor:professors(name)', { count: 'exact' })
+
+  if (periodo === 'proximas') {
+    listQuery = listQuery.gte('scheduled_at', hoje).order('scheduled_at', { ascending: true })
+  } else if (periodo === 'passadas') {
+    listQuery = listQuery.lt('scheduled_at', hoje).order('scheduled_at', { ascending: false })
+  } else {
+    listQuery = listQuery.order('scheduled_at', { ascending: true })
+  }
+
+  listQuery = listQuery.range(from, to)
+
+  // ── Query sem paginação (para o calendário) ───────────────────────────────
+  let calQuery = supabase
     .from('classes')
     .select('*, student:students(name), professor:professors(name)')
-    .order('scheduled_at', { ascending: false })
-    .limit(200)
+    .order('scheduled_at', { ascending: true })
+    .limit(500)
 
-  const total = classes?.length ?? 0
-  const agendadas = classes?.filter(c => c.status === 'agendada').length ?? 0
+  const [{ data: classes, count }, { data: allClasses }] = await Promise.all([
+    listQuery,
+    calQuery,
+  ])
+
+  const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE)
+
+  // Contadores globais (sobre todos, não filtrado)
+  const { data: stats } = await supabase
+    .from('classes')
+    .select('id, status, scheduled_at')
+
+  const agendadas = stats?.filter(c => c.status === 'agendada' && c.scheduled_at >= hoje).length ?? 0
+  const total     = stats?.length ?? 0
 
   return (
     <div className="space-y-6">
@@ -36,7 +80,18 @@ export default async function AulasPage() {
         </Link>
       </div>
 
-      <AulasView classes={classes ?? []} />
+      <Suspense>
+        <AulasFiltros />
+      </Suspense>
+
+      <AulasView
+        classes={classes ?? []}
+        allClasses={allClasses ?? []}
+        page={pageNum}
+        totalPages={totalPages}
+        total={count ?? 0}
+        periodo={periodo}
+      />
     </div>
   )
 }
