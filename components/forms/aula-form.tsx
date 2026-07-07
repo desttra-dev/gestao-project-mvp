@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -12,11 +12,30 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import type { Student, Professor, Enrollment } from '@/lib/types'
 import { createAulaGoogleEvent } from '@/app/actions/aulas'
+import { addDays, addWeeks, format, parseISO } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 
 interface AulaFormProps {
   students: Student[]
   professors: Professor[]
   enrollments: Enrollment[]
+}
+
+type RepeatMode = 'none' | 'daily' | 'weekly'
+
+function buildDates(scheduledAt: string, repeat: RepeatMode, repeatUntil: string): Date[] {
+  const start = new Date(scheduledAt)
+  if (repeat === 'none' || !repeatUntil) return [start]
+
+  const until = new Date(repeatUntil + 'T23:59:59')
+  const dates: Date[] = []
+  let current = start
+
+  while (current <= until && dates.length < 60) {
+    dates.push(new Date(current))
+    current = repeat === 'daily' ? addDays(current, 1) : addWeeks(current, 1)
+  }
+  return dates
 }
 
 export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
@@ -31,27 +50,37 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
     scheduled_at: '',
     level: 'fundamental' as string,
     notes: '',
+    repeat: 'none' as RepeatMode,
+    repeat_until: '',
   })
 
   const filteredEnrollments = enrollments.filter(
     e => (!form.student_id || e.student_id === form.student_id) && e.status === 'ativo'
   )
 
+  const previewDates = useMemo(() => {
+    if (!form.scheduled_at || form.repeat === 'none') return []
+    return buildDates(form.scheduled_at, form.repeat, form.repeat_until)
+  }, [form.scheduled_at, form.repeat, form.repeat_until])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!form.scheduled_at) return
     setLoading(true)
 
-    const payload = {
+    const dates = buildDates(form.scheduled_at, form.repeat, form.repeat_until)
+
+    const payloads = dates.map(d => ({
       student_id: form.student_id,
       teacher_id: form.teacher_id,
       enrollment_id: form.enrollment_id || null,
-      scheduled_at: new Date(form.scheduled_at).toISOString(),
+      scheduled_at: d.toISOString(),
       level: form.level,
       status: 'agendada',
       notes: form.notes || null,
-    }
+    }))
 
-    const { error } = await supabase.from('classes').insert(payload)
+    const { error } = await supabase.from('classes').insert(payloads)
 
     setLoading(false)
 
@@ -60,16 +89,25 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
       return
     }
 
-    toast.success('Aula registrada!')
+    const studentName = students.find(s => s.id === form.student_id)?.name ?? 'Aluno'
+    const professorName = professors.find(p => p.id === form.teacher_id)?.name ?? 'Prof'
 
-    // Google Calendar — non-blocking, failure doesn't affect the save
-    createAulaGoogleEvent({
-      studentName: students.find(s => s.id === form.student_id)?.name ?? 'Aluno',
-      professorName: professors.find(p => p.id === form.teacher_id)?.name ?? 'Prof',
-      scheduledAt: form.scheduled_at,
-      level: form.level,
-      notes: form.notes,
-    }).catch(() => {})
+    toast.success(
+      dates.length > 1
+        ? `${dates.length} aulas registradas!`
+        : 'Aula registrada!'
+    )
+
+    // Google Calendar — non-blocking para cada data
+    dates.forEach(d => {
+      createAulaGoogleEvent({
+        studentName,
+        professorName,
+        scheduledAt: d.toISOString(),
+        level: form.level,
+        notes: form.notes,
+      }).catch(() => {})
+    })
 
     router.push('/aulas')
     router.refresh()
@@ -124,7 +162,7 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
               disabled={!form.student_id}
             >
               <SelectTrigger>
-                <SelectValue placeholder={form.student_id ? "Selecione a matrícula (opcional)" : "Selecione um aluno primeiro"} />
+                <SelectValue placeholder={form.student_id ? 'Selecione a matrícula (opcional)' : 'Selecione um aluno primeiro'} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Aula avulsa (sem matrícula)</SelectItem>
@@ -166,6 +204,57 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
             </Select>
           </div>
 
+          {/* Repetição */}
+          <div className="space-y-2">
+            <Label>Repetição</Label>
+            <Select
+              value={form.repeat}
+              onValueChange={v => setForm(f => ({ ...f, repeat: v as RepeatMode, repeat_until: '' }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Não repete</SelectItem>
+                <SelectItem value="daily">Repete todo dia</SelectItem>
+                <SelectItem value="weekly">Repete semanalmente (mesmo dia da semana)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {form.repeat !== 'none' && (
+            <div className="space-y-2">
+              <Label htmlFor="repeat_until">Repetir até *</Label>
+              <Input
+                id="repeat_until"
+                type="date"
+                value={form.repeat_until}
+                min={form.scheduled_at ? form.scheduled_at.slice(0, 10) : undefined}
+                onChange={e => setForm(f => ({ ...f, repeat_until: e.target.value }))}
+                required
+              />
+              {previewDates.length > 0 && (
+                <div className="rounded-lg p-3 space-y-1" style={{ backgroundColor: '#e8faf0', border: '1px solid #d4e8d4' }}>
+                  <p className="text-xs font-semibold" style={{ color: '#1e6b40' }}>
+                    {previewDates.length} aula{previewDates.length !== 1 ? 's' : ''} serão criadas:
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {previewDates.slice(0, 8).map((d, i) => (
+                      <span key={i} className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'white', color: '#1e6b40', border: '1px solid #d4e8d4' }}>
+                        {format(d, "dd/MM (EEE)", { locale: ptBR })}
+                      </span>
+                    ))}
+                    {previewDates.length > 8 && (
+                      <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: '#6b8c6b' }}>
+                        +{previewDates.length - 8} mais
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="notes">Observações</Label>
             <Textarea
@@ -177,8 +266,12 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
           </div>
 
           <div className="flex gap-3 pt-2">
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Salvando...' : 'Registrar Aula'}
+            <Button type="submit" disabled={loading || (form.repeat !== 'none' && !form.repeat_until)}>
+              {loading
+                ? 'Salvando...'
+                : previewDates.length > 1
+                  ? `Registrar ${previewDates.length} Aulas`
+                  : 'Registrar Aula'}
             </Button>
             <Button type="button" variant="outline" onClick={() => router.back()}>
               Cancelar
