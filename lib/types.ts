@@ -80,9 +80,11 @@ export interface Class {
   student_id: string
   teacher_id: string
   scheduled_at: string
+  ends_at: string | null
   level: ClassLevel
   subject: ClassSubject | null
   status: ClassStatus
+  price: number | null
   notes: string | null
   created_at: string
   student?: Student

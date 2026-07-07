@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import type { Student, Professor, Enrollment } from '@/lib/types'
 import { createAulaGoogleEvent } from '@/app/actions/aulas'
-import { addDays, addWeeks, format } from 'date-fns'
+import { addDays, addWeeks, addHours, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 interface AulaFormProps {
@@ -46,6 +46,7 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
     teacher_id: '',
     enrollment_id: '',
     scheduled_at: '',
+    ends_at_time: '',
     level: 'fundamental',
     subject: '',
     price: '',
@@ -71,17 +72,27 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
 
     const dates = buildDates(form.scheduled_at, form.repeat, form.repeat_until)
 
-    const payloads = dates.map(d => ({
-      student_id: form.student_id,
-      teacher_id: form.teacher_id,
-      enrollment_id: form.enrollment_id || null,
-      scheduled_at: d.toISOString(),
-      level: form.level,
-      subject: form.subject || null,
-      price: form.price ? parseFloat(form.price) : null,
-      status: 'agendada',
-      notes: form.notes || null,
-    }))
+    const payloads = dates.map(d => {
+      let endsAt: string | null = null
+      if (form.ends_at_time) {
+        const end = new Date(d)
+        const [h, m] = form.ends_at_time.split(':').map(Number)
+        end.setHours(h, m, 0, 0)
+        endsAt = end.toISOString()
+      }
+      return {
+        student_id: form.student_id,
+        teacher_id: form.teacher_id,
+        enrollment_id: form.enrollment_id || null,
+        scheduled_at: d.toISOString(),
+        ends_at: endsAt,
+        level: form.level,
+        subject: form.subject || null,
+        price: form.price ? parseFloat(form.price) : null,
+        status: 'agendada',
+        notes: form.notes || null,
+      }
+    })
 
     const { error } = await supabase.from('classes').insert(payloads)
     setLoading(false)
@@ -213,21 +224,38 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
             </div>
           </div>
 
-          {/* Data/Hora + Valor — lado a lado */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Início + Término + Valor — 3 colunas */}
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="scheduled_at">Data e Hora *</Label>
+              <Label htmlFor="scheduled_at">Início *</Label>
               <Input
                 id="scheduled_at"
                 type="datetime-local"
                 value={form.scheduled_at}
-                onChange={e => setForm(f => ({ ...f, scheduled_at: e.target.value }))}
+                onChange={e => {
+                  const val = e.target.value
+                  setForm(f => ({
+                    ...f,
+                    scheduled_at: val,
+                    ends_at_time: f.ends_at_time || (val ? format(addHours(new Date(val), 1), 'HH:mm') : ''),
+                  }))
+                }}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="price">Valor da Aula (R$)</Label>
+              <Label htmlFor="ends_at_time">Término</Label>
+              <Input
+                id="ends_at_time"
+                type="time"
+                value={form.ends_at_time}
+                onChange={e => setForm(f => ({ ...f, ends_at_time: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="price">Valor (R$)</Label>
               <Input
                 id="price"
                 type="number"
