@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
-import type { Student, Professor, Enrollment } from '@/lib/types'
+import type { Student, Professor, Enrollment, Class } from '@/lib/types'
 import { createAulaGoogleEvent } from '@/app/actions/aulas'
 import { addDays, addWeeks, addHours, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -19,9 +19,16 @@ interface AulaFormProps {
   students: Student[]
   professors: Professor[]
   enrollments: Enrollment[]
+  aula?: Class
 }
 
 type RepeatMode = 'none' | 'daily' | 'weekly'
+
+const SUBJECT_LABELS: Record<string, string> = {
+  matematica: 'Matemática', fisica: 'Física', quimica: 'Química', portugues: 'Português',
+  historia: 'História', geografia: 'Geografia', filosofia: 'Filosofia',
+  redacao: 'Redação', sociologia: 'Sociologia',
+}
 
 function buildDates(scheduledAt: string, repeat: RepeatMode, repeatUntil: string): Date[] {
   const start = new Date(scheduledAt)
@@ -36,23 +43,29 @@ function buildDates(scheduledAt: string, repeat: RepeatMode, repeatUntil: string
   return dates
 }
 
-export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
+function toDatetimeLocal(iso: string) {
+  return format(new Date(iso), "yyyy-MM-dd'T'HH:mm")
+}
+
+export function AulaForm({ students, professors, enrollments, aula }: AulaFormProps) {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
+  const isEditing = !!aula
 
   const [form, setForm] = useState({
-    student_id: '',
-    teacher_id: '',
-    enrollment_id: '',
-    scheduled_at: '',
-    ends_at_time: '',
-    level: 'fundamental',
-    subject: '',
-    price: '',
-    notes: '',
-    repeat: 'none' as RepeatMode,
-    repeat_until: '',
+    student_id:    aula?.student_id  ?? '',
+    teacher_id:    aula?.teacher_id  ?? '',
+    enrollment_id: aula?.enrollment_id ?? '',
+    scheduled_at:  aula?.scheduled_at  ? toDatetimeLocal(aula.scheduled_at) : '',
+    ends_at_time:  aula?.ends_at       ? format(new Date(aula.ends_at), 'HH:mm') : '',
+    level:         aula?.level   ?? 'fundamental',
+    subject:       aula?.subject ?? '',
+    price:         aula?.price   != null ? String(aula.price) : '',
+    status:        aula?.status  ?? 'agendada',
+    notes:         aula?.notes   ?? '',
+    repeat:        'none' as RepeatMode,
+    repeat_until:  '',
   })
 
   const filteredEnrollments = useMemo(
@@ -61,17 +74,52 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
   )
 
   const previewDates = useMemo(() => {
-    if (!form.scheduled_at || form.repeat === 'none') return []
+    if (isEditing || !form.scheduled_at || form.repeat === 'none') return []
     return buildDates(form.scheduled_at, form.repeat, form.repeat_until)
-  }, [form.scheduled_at, form.repeat, form.repeat_until])
+  }, [isEditing, form.scheduled_at, form.repeat, form.repeat_until])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.student_id || !form.teacher_id || !form.scheduled_at) return
     setLoading(true)
 
-    const dates = buildDates(form.scheduled_at, form.repeat, form.repeat_until)
+    if (isEditing) {
+      // ── EDIT ──────────────────────────────────────────────────────────────
+      const startDt = new Date(form.scheduled_at)
+      let endsAt: string | null = null
+      if (form.ends_at_time) {
+        const end = new Date(startDt)
+        const [h, m] = form.ends_at_time.split(':').map(Number)
+        end.setHours(h, m, 0, 0)
+        endsAt = end.toISOString()
+      }
 
+      const { error } = await supabase
+        .from('classes')
+        .update({
+          student_id:    form.student_id,
+          teacher_id:    form.teacher_id,
+          enrollment_id: form.enrollment_id || null,
+          scheduled_at:  startDt.toISOString(),
+          ends_at:       endsAt,
+          level:         form.level,
+          subject:       form.subject || null,
+          price:         form.price ? parseFloat(form.price) : null,
+          status:        form.status,
+          notes:         form.notes || null,
+        })
+        .eq('id', aula!.id)
+
+      setLoading(false)
+      if (error) { toast.error('Erro ao salvar: ' + error.message); return }
+      toast.success('Aula atualizada!')
+      router.push('/aulas')
+      router.refresh()
+      return
+    }
+
+    // ── CREATE ──────────────────────────────────────────────────────────────
+    const dates = buildDates(form.scheduled_at, form.repeat, form.repeat_until)
     const payloads = dates.map(d => {
       let endsAt: string | null = null
       if (form.ends_at_time) {
@@ -81,55 +129,44 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
         endsAt = end.toISOString()
       }
       return {
-        student_id: form.student_id,
-        teacher_id: form.teacher_id,
+        student_id:    form.student_id,
+        teacher_id:    form.teacher_id,
         enrollment_id: form.enrollment_id || null,
-        scheduled_at: d.toISOString(),
-        ends_at: endsAt,
-        level: form.level,
-        subject: form.subject || null,
-        price: form.price ? parseFloat(form.price) : null,
-        status: 'agendada',
-        notes: form.notes || null,
+        scheduled_at:  d.toISOString(),
+        ends_at:       endsAt,
+        level:         form.level,
+        subject:       form.subject || null,
+        price:         form.price ? parseFloat(form.price) : null,
+        status:        'agendada',
+        notes:         form.notes || null,
       }
     })
 
     const { error } = await supabase.from('classes').insert(payloads)
     setLoading(false)
+    if (error) { toast.error('Erro ao registrar: ' + error.message); return }
 
-    if (error) {
-      toast.error('Erro ao registrar aula: ' + error.message)
-      return
-    }
-
-    const studentName = students.find(s => s.id === form.student_id)?.name ?? 'Aluno'
+    const studentName   = students.find(s => s.id === form.student_id)?.name ?? 'Aluno'
     const professorName = professors.find(p => p.id === form.teacher_id)?.name ?? 'Prof'
-
     toast.success(dates.length > 1 ? `${dates.length} aulas registradas!` : 'Aula registrada!')
 
     dates.forEach(d => {
-      createAulaGoogleEvent({
-        studentName,
-        professorName,
-        scheduledAt: d.toISOString(),
-        level: form.level,
-        notes: form.notes,
-      }).catch(() => {})
+      createAulaGoogleEvent({ studentName, professorName, scheduledAt: d.toISOString(), level: form.level, notes: form.notes }).catch(() => {})
     })
 
     router.push('/aulas')
     router.refresh()
   }
 
-  const selectedStudent = students.find(s => s.id === form.student_id)
-  const selectedProfessor = professors.find(p => p.id === form.teacher_id)
+  const selectedStudent    = students.find(s => s.id === form.student_id)
+  const selectedProfessor  = professors.find(p => p.id === form.teacher_id)
   const selectedEnrollment = filteredEnrollments.find(e => e.id === form.enrollment_id)
 
   return (
     <form onSubmit={handleSubmit}>
       <Card className="max-w-2xl">
         <CardHeader>
-          <CardTitle>Nova Aula</CardTitle>
+          <CardTitle>{isEditing ? 'Editar Aula' : 'Nova Aula'}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
 
@@ -141,14 +178,10 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
               onValueChange={v => { if (v) setForm(f => ({ ...f, student_id: v, enrollment_id: '' })) }}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione o aluno">
-                  {selectedStudent?.name}
-                </SelectValue>
+                <SelectValue placeholder="Selecione o aluno">{selectedStudent?.name}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {students.map(s => (
-                  <SelectItem key={s.id} value={s.id} label={s.name}>{s.name}</SelectItem>
-                ))}
+                {students.map(s => <SelectItem key={s.id} value={s.id} label={s.name}>{s.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -161,19 +194,15 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
               onValueChange={v => { if (v) setForm(f => ({ ...f, teacher_id: v })) }}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione o professor">
-                  {selectedProfessor?.name}
-                </SelectValue>
+                <SelectValue placeholder="Selecione o professor">{selectedProfessor?.name}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {professors.map(p => (
-                  <SelectItem key={p.id} value={p.id} label={p.name}>{p.name}</SelectItem>
-                ))}
+                {professors.map(p => <SelectItem key={p.id} value={p.id} label={p.name}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Matéria + Nível — lado a lado */}
+          {/* Matéria + Nível */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Matéria</Label>
@@ -183,32 +212,21 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Sem matéria">
-                    {form.subject
-                      ? ({ matematica: 'Matemática', fisica: 'Física', quimica: 'Química', portugues: 'Português', historia: 'História', geografia: 'Geografia', filosofia: 'Filosofia', redacao: 'Redação', sociologia: 'Sociologia' }[form.subject] ?? form.subject)
-                      : 'Sem matéria'}
+                    {form.subject ? (SUBJECT_LABELS[form.subject] ?? form.subject) : 'Sem matéria'}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none" label="— Sem matéria —">— Sem matéria —</SelectItem>
-                  <SelectItem value="matematica" label="Matemática">Matemática</SelectItem>
-                  <SelectItem value="fisica" label="Física">Física</SelectItem>
-                  <SelectItem value="quimica" label="Química">Química</SelectItem>
-                  <SelectItem value="portugues" label="Português">Português</SelectItem>
-                  <SelectItem value="historia" label="História">História</SelectItem>
-                  <SelectItem value="geografia" label="Geografia">Geografia</SelectItem>
-                  <SelectItem value="filosofia" label="Filosofia">Filosofia</SelectItem>
-                  <SelectItem value="redacao" label="Redação">Redação</SelectItem>
-                  <SelectItem value="sociologia" label="Sociologia">Sociologia</SelectItem>
+                  {Object.entries(SUBJECT_LABELS).map(([v, l]) => (
+                    <SelectItem key={v} value={v} label={l}>{l}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
               <Label>Nível *</Label>
-              <Select
-                value={form.level}
-                onValueChange={v => { if (v) setForm(f => ({ ...f, level: v })) }}
-              >
+              <Select value={form.level} onValueChange={v => { if (v) setForm(f => ({ ...f, level: v })) }}>
                 <SelectTrigger className="w-full">
                   <SelectValue>
                     {{ fundamental: 'Fundamental', medio: 'Médio', superior: 'Superior', internacional: 'Internacional' }[form.level]}
@@ -216,15 +234,15 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="fundamental" label="Fundamental">Fundamental (R$40 repasse)</SelectItem>
-                  <SelectItem value="medio" label="Médio">Médio (R$45 repasse)</SelectItem>
-                  <SelectItem value="superior" label="Superior">Superior (R$50 repasse)</SelectItem>
+                  <SelectItem value="medio"       label="Médio">Médio (R$45 repasse)</SelectItem>
+                  <SelectItem value="superior"    label="Superior">Superior (R$50 repasse)</SelectItem>
                   <SelectItem value="internacional" label="Internacional">Internacional (R$50 repasse)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* Início + Término + Valor — 3 colunas */}
+          {/* Início + Término + Valor */}
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
               <Label htmlFor="scheduled_at">Início *</Label>
@@ -243,7 +261,6 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
                 required
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="ends_at_time">Término</Label>
               <Input
@@ -253,7 +270,6 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
                 onChange={e => setForm(f => ({ ...f, ends_at_time: e.target.value }))}
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="price">Valor (R$)</Label>
               <Input
@@ -268,6 +284,25 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
             </div>
           </div>
 
+          {/* Status — só no edit */}
+          {isEditing && (
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={v => { if (v) setForm(f => ({ ...f, status: v })) }}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {{ agendada: 'Agendada', realizada: 'Realizada', cancelada: 'Cancelada' }[form.status]}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="agendada"  label="Agendada">Agendada</SelectItem>
+                  <SelectItem value="realizada" label="Realizada">Realizada</SelectItem>
+                  <SelectItem value="cancelada" label="Cancelada">Cancelada</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Matrícula / Plano */}
           <div className="space-y-2">
             <Label>Matrícula / Plano</Label>
@@ -278,9 +313,7 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder={form.student_id ? 'Selecione o plano' : 'Selecione um aluno primeiro'}>
-                  {form.enrollment_id
-                    ? ((selectedEnrollment?.plan as any)?.name ?? 'Plano')
-                    : 'Aula avulsa'}
+                  {form.enrollment_id ? ((selectedEnrollment?.plan as any)?.name ?? 'Plano') : 'Aula avulsa'}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -294,41 +327,43 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
             </Select>
           </div>
 
-          {/* Repetição + Repetir até — lado a lado quando ativado */}
-          <div className={form.repeat !== 'none' ? 'grid grid-cols-2 gap-3' : ''}>
-            <div className="space-y-2">
-              <Label>Repetição</Label>
-              <Select
-                value={form.repeat}
-                onValueChange={v => setForm(f => ({ ...f, repeat: v as RepeatMode, repeat_until: '' }))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue>
-                    {{ none: 'Não repete', daily: 'Todo dia', weekly: 'Semanalmente' }[form.repeat]}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none" label="Não repete">Não repete</SelectItem>
-                  <SelectItem value="daily" label="Todo dia">Repete todo dia</SelectItem>
-                  <SelectItem value="weekly" label="Semanalmente">Repete semanalmente (mesmo dia)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {form.repeat !== 'none' && (
+          {/* Repetição — só na criação */}
+          {!isEditing && (
+            <div className={form.repeat !== 'none' ? 'grid grid-cols-2 gap-3' : ''}>
               <div className="space-y-2">
-                <Label htmlFor="repeat_until">Repetir até *</Label>
-                <Input
-                  id="repeat_until"
-                  type="date"
-                  value={form.repeat_until}
-                  min={form.scheduled_at ? form.scheduled_at.slice(0, 10) : undefined}
-                  onChange={e => setForm(f => ({ ...f, repeat_until: e.target.value }))}
-                  required
-                />
+                <Label>Repetição</Label>
+                <Select
+                  value={form.repeat}
+                  onValueChange={v => setForm(f => ({ ...f, repeat: v as RepeatMode, repeat_until: '' }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue>
+                      {{ none: 'Não repete', daily: 'Todo dia', weekly: 'Semanalmente' }[form.repeat]}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none"   label="Não repete">Não repete</SelectItem>
+                    <SelectItem value="daily"  label="Todo dia">Repete todo dia</SelectItem>
+                    <SelectItem value="weekly" label="Semanalmente">Repete semanalmente (mesmo dia)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            )}
-          </div>
+
+              {form.repeat !== 'none' && (
+                <div className="space-y-2">
+                  <Label htmlFor="repeat_until">Repetir até *</Label>
+                  <Input
+                    id="repeat_until"
+                    type="date"
+                    value={form.repeat_until}
+                    min={form.scheduled_at ? form.scheduled_at.slice(0, 10) : undefined}
+                    onChange={e => setForm(f => ({ ...f, repeat_until: e.target.value }))}
+                    required
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Preview datas */}
           {previewDates.length > 1 && (
@@ -365,13 +400,15 @@ export function AulaForm({ students, professors, enrollments }: AulaFormProps) {
           <div className="flex gap-3 pt-2">
             <Button
               type="submit"
-              disabled={loading || !form.student_id || !form.teacher_id || !form.scheduled_at || (form.repeat !== 'none' && !form.repeat_until)}
+              disabled={
+                loading ||
+                !form.student_id ||
+                !form.teacher_id ||
+                !form.scheduled_at ||
+                (!isEditing && form.repeat !== 'none' && !form.repeat_until)
+              }
             >
-              {loading
-                ? 'Salvando...'
-                : previewDates.length > 1
-                  ? `Registrar ${previewDates.length} Aulas`
-                  : 'Registrar Aula'}
+              {loading ? 'Salvando...' : isEditing ? 'Salvar Alterações' : previewDates.length > 1 ? `Registrar ${previewDates.length} Aulas` : 'Registrar Aula'}
             </Button>
             <Button type="button" variant="outline" onClick={() => router.back()}>
               Cancelar

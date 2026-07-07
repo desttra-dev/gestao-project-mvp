@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { MoreHorizontal, CheckCircle, XCircle } from 'lucide-react'
+import { MoreHorizontal, CheckCircle, XCircle, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface AulaActionsProps {
@@ -42,6 +42,10 @@ export function AulaActions({ aulaId, status }: AulaActionsProps) {
         <MoreHorizontal className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => router.push(`/aulas/${aulaId}`)}>
+          <Pencil className="h-4 w-4 mr-2" />
+          Editar
+        </DropdownMenuItem>
         {status !== 'realizada' && (
           <DropdownMenuItem onClick={() => updateStatus('realizada')}>
             <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
