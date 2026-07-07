@@ -3,10 +3,8 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { AulasView } from '@/components/aulas-view'
-import { AulasFiltros } from '@/components/ui/aulas-filtros'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
-import { Suspense } from 'react'
 import { format } from 'date-fns'
 
 const PAGE_SIZE = 50
@@ -79,10 +77,6 @@ export default async function AulasPage({
           </Button>
         </Link>
       </div>
-
-      <Suspense>
-        <AulasFiltros />
-      </Suspense>
 
       <AulasView
         classes={classes ?? []}

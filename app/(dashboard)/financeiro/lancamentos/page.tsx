@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { LancamentosFiltros } from '@/components/ui/lancamentos-filtros'
+import { LancamentosExport } from '@/components/ui/lancamentos-export'
 import Link from 'next/link'
 import { Plus, TrendingUp, TrendingDown, Pencil } from 'lucide-react'
 import { format, subDays } from 'date-fns'
@@ -55,9 +56,12 @@ export default async function LancamentosPage({
           <h1 className="text-h1">Lançamentos</h1>
           <p className="text-body mt-1" style={{ color: '#6b8c6b' }}>{periodoLabel} · {transactions?.length ?? 0} registros</p>
         </div>
-        <Link href="/financeiro/lancamentos/novo">
-          <Button><Plus className="h-4 w-4 mr-2" />Novo Lançamento</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <LancamentosExport />
+          <Link href="/financeiro/lancamentos/novo">
+            <Button><Plus className="h-4 w-4 mr-2" />Novo Lançamento</Button>
+          </Link>
+        </div>
       </div>
 
       {/* Filtro temporal */}

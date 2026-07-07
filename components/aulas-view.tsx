@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -45,46 +46,68 @@ interface AulasViewProps {
   periodo: string
 }
 
-const periodoLabel: Record<string, string> = {
-  proximas: 'Próximas',
-  passadas: 'Passadas',
-  tudo:     'Todas',
-}
+const PERIODOS = [
+  { key: 'proximas', label: 'Próximas' },
+  { key: 'passadas', label: 'Passadas' },
+  { key: 'tudo',     label: 'Tudo'     },
+]
 
 export function AulasView({ classes, allClasses, page, totalPages, total, periodo }: AulasViewProps) {
   const [view, setView] = useState<'lista' | 'calendario'>('lista')
+  const router = useRouter()
 
   const prevHref = `?periodo=${periodo}&page=${page - 1}`
   const nextHref = `?periodo=${periodo}&page=${page + 1}`
 
   return (
     <div className="space-y-4">
-      {/* Toggle lista / calendário */}
-      <div className="flex gap-1 p-1 rounded-lg w-fit" style={{ backgroundColor: '#f5f7f5', border: '1px solid #d4e8d4' }}>
-        <button
-          onClick={() => setView('lista')}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
-          style={{
-            backgroundColor: view === 'lista' ? 'white' : 'transparent',
-            color: view === 'lista' ? '#1e6b40' : '#6b8c6b',
-            boxShadow: view === 'lista' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-          }}
-        >
-          <List className="h-4 w-4" />
-          Lista
-        </button>
-        <button
-          onClick={() => setView('calendario')}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
-          style={{
-            backgroundColor: view === 'calendario' ? 'white' : 'transparent',
-            color: view === 'calendario' ? '#1e6b40' : '#6b8c6b',
-            boxShadow: view === 'calendario' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-          }}
-        >
-          <CalendarDays className="h-4 w-4" />
-          Calendário
-        </button>
+      {/* Toggle lista / calendário + filtro de período */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-1 p-1 rounded-lg w-fit" style={{ backgroundColor: '#f5f7f5', border: '1px solid #d4e8d4' }}>
+          <button
+            onClick={() => setView('lista')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
+            style={{
+              backgroundColor: view === 'lista' ? 'white' : 'transparent',
+              color: view === 'lista' ? '#1e6b40' : '#6b8c6b',
+              boxShadow: view === 'lista' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+            }}
+          >
+            <List className="h-4 w-4" />
+            Lista
+          </button>
+          <button
+            onClick={() => setView('calendario')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
+            style={{
+              backgroundColor: view === 'calendario' ? 'white' : 'transparent',
+              color: view === 'calendario' ? '#1e6b40' : '#6b8c6b',
+              boxShadow: view === 'calendario' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+            }}
+          >
+            <CalendarDays className="h-4 w-4" />
+            Calendário
+          </button>
+        </div>
+
+        {view === 'lista' && (
+          <div className="flex gap-1 p-1 rounded-lg" style={{ backgroundColor: '#f5f7f5', border: '1px solid #d4e8d4' }}>
+            {PERIODOS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => router.push(`?periodo=${key}&page=1`)}
+                className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: periodo === key ? 'white' : 'transparent',
+                  color:           periodo === key ? '#1e6b40' : '#6b8c6b',
+                  boxShadow:       periodo === key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {view === 'calendario' ? (
@@ -94,7 +117,7 @@ export function AulasView({ classes, allClasses, page, totalPages, total, period
           {/* Info + paginação topo */}
           <div className="flex items-center justify-between">
             <p className="text-sm" style={{ color: '#6b8c6b' }}>
-              {periodoLabel[periodo] ?? periodo} · {total} aula{total !== 1 ? 's' : ''}
+              {PERIODOS.find(p => p.key === periodo)?.label ?? periodo} · {total} aula{total !== 1 ? 's' : ''}
               {totalPages > 1 && ` · página ${page} de ${totalPages}`}
             </p>
 
