@@ -27,7 +27,7 @@ export async function notifyProfessorNewAulas({
   level,
   subject,
   notes,
-  dates, // array of { scheduledAt: string, endsAt: string | null }
+  dates,
 }: {
   professorEmail: string
   professorName: string
@@ -37,6 +37,7 @@ export async function notifyProfessorNewAulas({
   notes?: string | null
   dates: { scheduledAt: string; endsAt: string | null }[]
 }) {
+  console.log('[notifyProfessorNewAulas] enviando para:', professorEmail)
   const isSeries = dates.length > 1
   const levelLabel   = levelLabels[level]   ?? level
   const subjectLabel = subject ? (subjectLabels[subject] ?? subject) : null

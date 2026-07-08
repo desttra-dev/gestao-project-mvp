@@ -234,7 +234,9 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
           scheduledAt: d.toISOString(),
           endsAt: computeEndsAt(d.toISOString(), form.ends_at_time),
         })),
-      }).catch(() => {})
+      }).catch(err => console.error('[notifyProf] erro:', err))
+    } else {
+      console.warn('[notifyProf] professor sem email, pulando:', form.teacher_id)
     }
 
     if (inserted && inserted.length > 0) {
