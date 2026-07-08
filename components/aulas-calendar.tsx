@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, format, isSameMonth, isSameDay, isToday,
@@ -8,16 +10,17 @@ import {
   getHours, getMinutes,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, CalendarDays, CalendarRange, Clock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CalendarDays, CalendarRange, Clock, X, Pencil, CheckCircle, XCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { toast } from 'sonner'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const HOUR_H = 60        // px per hour
-const START_H = 7        // 7:00
-const END_H = 23         // 23:00
+const HOUR_H  = 60
+const START_H = 7
+const END_H   = 23
 const TOTAL_H = END_H - START_H
-const HOURS = Array.from({ length: TOTAL_H }, (_, i) => START_H + i)
+const HOURS   = Array.from({ length: TOTAL_H }, (_, i) => START_H + i)
 const DIAS_CURTOS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
 const subjectLabels: Record<string, string> = {
@@ -29,7 +32,7 @@ const levelLabels: Record<string, string> = {
   fundamental: 'Fund.', medio: 'Médio', superior: 'Sup.', internacional: 'Intl.',
 }
 const statusStyle: Record<string, { bg: string; text: string; dot: string; border: string; label: string }> = {
-  agendada:  { bg: '#e8faf0', text: '#1e6b40', dot: '#1e6b40', border: '#1e6b40', label: 'Agendada' },
+  agendada:  { bg: '#e8faf0', text: '#1e6b40', dot: '#1e6b40', border: '#1e6b40', label: 'Agendada'  },
   realizada: { bg: '#f3f4f6', text: '#6b7280', dot: '#9ca3af', border: '#9ca3af', label: 'Realizada' },
   cancelada: { bg: '#fee2e2', text: '#b91c1c', dot: '#ef4444', border: '#ef4444', label: 'Cancelada' },
 }
@@ -68,9 +71,146 @@ function currentTimeTop(now: Date) {
   return (getHours(now) + getMinutes(now) / 60 - START_H) * HOUR_H
 }
 
-// ─── Time Grid (shared by Week & Day) ────────────────────────────────────────
+// ─── Event Popup ──────────────────────────────────────────────────────────────
 
-function TimeGrid({ days, classes }: { days: Date[]; classes: ClassItem[] }) {
+function EventPopup({
+  event,
+  onClose,
+  onUpdated,
+}: {
+  event: ClassItem
+  onClose: () => void
+  onUpdated: () => void
+}) {
+  const router = useRouter()
+  const supabase = createClient()
+  const [loading, setLoading] = useState(false)
+  const start = new Date(event.scheduled_at)
+  const end   = getEndsAt(event)
+  const st    = statusStyle[event.status] ?? statusStyle.agendada
+
+  const marcarRealizada = async () => {
+    setLoading(true)
+    const { error } = await supabase.from('classes').update({ status: 'realizada' }).eq('id', event.id)
+    setLoading(false)
+    if (error) { toast.error('Erro ao atualizar'); return }
+    toast.success('Aula marcada como realizada!')
+    onClose()
+    onUpdated()
+  }
+
+  const cancelar = async () => {
+    setLoading(true)
+    await fetch('/api/aulas/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aulaId: event.id }),
+    })
+    setLoading(false)
+    toast.success('Aula cancelada.')
+    onClose()
+    onUpdated()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-xl p-5 w-full max-w-sm mx-4"
+        style={{ border: '1px solid #d4e8d4' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <p className="font-semibold text-base" style={{ color: '#0d2e1e' }}>
+              {event.student?.name ?? '—'}
+            </p>
+            <p className="text-sm capitalize" style={{ color: '#6b8c6b' }}>
+              {format(start, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+            </p>
+            <p className="text-sm font-medium" style={{ color: '#1e6b40' }}>
+              {format(start, 'HH:mm')} – {format(end, 'HH:mm')}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100">
+            <X className="h-4 w-4" style={{ color: '#6b8c6b' }} />
+          </button>
+        </div>
+
+        {/* Details */}
+        <div className="rounded-lg p-3 mb-4 space-y-1" style={{ backgroundColor: '#f5f7f5' }}>
+          <p className="text-xs" style={{ color: '#4a5a4a' }}>
+            <span style={{ color: '#6b8c6b' }}>Professor: </span>
+            {event.professor?.name ?? '—'}
+          </p>
+          {event.subject && (
+            <p className="text-xs" style={{ color: '#4a5a4a' }}>
+              <span style={{ color: '#6b8c6b' }}>Matéria: </span>
+              {subjectLabels[event.subject] ?? event.subject}
+            </p>
+          )}
+          <p className="text-xs" style={{ color: '#4a5a4a' }}>
+            <span style={{ color: '#6b8c6b' }}>Nível: </span>
+            {levelLabels[event.level] ?? event.level}
+          </p>
+          <div className="pt-1">
+            <Badge variant="outline" style={{ fontSize: '0.7rem', color: st.text, borderColor: st.border }}>
+              {st.label}
+            </Badge>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="space-y-2">
+          <button
+            onClick={() => router.push(`/aulas/${event.id}`)}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50"
+            style={{ border: '1px solid #d4e8d4', color: '#0d2e1e' }}
+          >
+            <Pencil className="h-4 w-4" style={{ color: '#1e6b40' }} />
+            Editar / Reagendar
+          </button>
+
+          {event.status === 'agendada' && (
+            <button
+              onClick={marcarRealizada}
+              disabled={loading}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-green-50"
+              style={{ border: '1px solid #bbf7d0', color: '#1e6b40' }}
+            >
+              <CheckCircle className="h-4 w-4" />
+              Confirmar como Realizada
+            </button>
+          )}
+
+          {event.status !== 'cancelada' && (
+            <button
+              onClick={cancelar}
+              disabled={loading}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-red-50"
+              style={{ border: '1px solid #fcd4d4', color: '#b91c1c' }}
+            >
+              <XCircle className="h-4 w-4" />
+              Cancelar Aula
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Time Grid (Week & Day) ───────────────────────────────────────────────────
+
+function TimeGrid({
+  days,
+  classes,
+  onEventClick,
+}: {
+  days: Date[]
+  classes: ClassItem[]
+  onEventClick: (c: ClassItem) => void
+}) {
   const [now, setNow] = useState(new Date())
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -95,14 +235,8 @@ function TimeGrid({ days, classes }: { days: Date[]; classes: ClassItem[] }) {
       <div className="flex" style={{ borderBottom: '1px solid #d4e8d4', backgroundColor: '#f5f7f5' }}>
         <div className="w-14 flex-shrink-0" />
         {days.map((d, i) => (
-          <div
-            key={i}
-            className="flex-1 text-center py-2"
-            style={{ borderLeft: '1px solid #d4e8d4' }}
-          >
-            <p className="text-xs font-medium" style={{ color: '#6b8c6b' }}>
-              {DIAS_CURTOS[d.getDay()]}
-            </p>
+          <div key={i} className="flex-1 text-center py-2" style={{ borderLeft: '1px solid #d4e8d4' }}>
+            <p className="text-xs font-medium" style={{ color: '#6b8c6b' }}>{DIAS_CURTOS[d.getDay()]}</p>
             <p
               className="text-sm font-bold w-7 h-7 mx-auto flex items-center justify-center rounded-full"
               style={{
@@ -135,26 +269,12 @@ function TimeGrid({ days, classes }: { days: Date[]; classes: ClassItem[] }) {
           {/* Day columns */}
           {days.map((d, di) => {
             const dayClasses = forDay(d)
-            const todayLine = isToday(d) ? currentTimeTop(now) : null
-
+            const todayLine  = isToday(d) ? currentTimeTop(now) : null
             return (
-              <div
-                key={di}
-                className="flex-1 relative"
-                style={{ borderLeft: '1px solid #d4e8d4' }}
-              >
-                {/* Hour lines */}
+              <div key={di} className="flex-1 relative" style={{ borderLeft: '1px solid #d4e8d4' }}>
                 {HOURS.map(h => (
-                  <div
-                    key={h}
-                    style={{
-                      position: 'absolute', top: (h - START_H) * HOUR_H,
-                      left: 0, right: 0, borderTop: '1px solid #f0f4f0',
-                    }}
-                  />
+                  <div key={h} style={{ position: 'absolute', top: (h - START_H) * HOUR_H, left: 0, right: 0, borderTop: '1px solid #f0f4f0' }} />
                 ))}
-
-                {/* Current time indicator */}
                 {todayLine !== null && todayLine >= 0 && todayLine <= TOTAL_H * HOUR_H && (
                   <div style={{ position: 'absolute', top: todayLine, left: 0, right: 0, zIndex: 10 }}>
                     <div style={{ height: 2, backgroundColor: '#ef4444', position: 'relative' }}>
@@ -162,27 +282,25 @@ function TimeGrid({ days, classes }: { days: Date[]; classes: ClassItem[] }) {
                     </div>
                   </div>
                 )}
-
-                {/* Events */}
                 {dayClasses.map(c => {
                   const start = new Date(c.scheduled_at)
-                  const end = getEndsAt(c)
+                  const end   = getEndsAt(c)
                   const { top, height } = eventPosition(start, end)
                   const st = statusStyle[c.status] ?? statusStyle.agendada
                   return (
                     <div
                       key={c.id}
+                      onClick={() => onEventClick(c)}
                       style={{
                         position: 'absolute', top: top + 1, left: 3, right: 3, height: height - 2,
                         backgroundColor: st.bg, color: st.text,
                         borderLeft: `3px solid ${st.border}`,
                         borderRadius: 4, padding: '2px 5px',
-                        overflow: 'hidden', cursor: 'default', zIndex: 5,
+                        overflow: 'hidden', cursor: 'pointer', zIndex: 5,
                       }}
                     >
                       <p className="text-xs font-semibold leading-tight truncate">
-                        {format(start, 'HH:mm')}
-                        {c.ends_at ? `–${format(end, 'HH:mm')}` : ''}
+                        {format(start, 'HH:mm')}{c.ends_at ? `–${format(end, 'HH:mm')}` : ''}
                       </p>
                       <p className="text-xs leading-tight truncate">{c.student?.name?.split(' ')[0] ?? '—'}</p>
                       {height > 44 && (
@@ -204,7 +322,15 @@ function TimeGrid({ days, classes }: { days: Date[]; classes: ClassItem[] }) {
 
 // ─── Month View ───────────────────────────────────────────────────────────────
 
-function MonthView({ current, classes }: { current: Date; classes: ClassItem[] }) {
+function MonthView({
+  current,
+  classes,
+  onEventClick,
+}: {
+  current: Date
+  classes: ClassItem[]
+  onEventClick: (c: ClassItem) => void
+}) {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
 
   const days = eachDayOfInterval({
@@ -218,18 +344,15 @@ function MonthView({ current, classes }: { current: Date; classes: ClassItem[] }
   return (
     <div className="space-y-3">
       <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #d4e8d4' }}>
-        {/* Day-of-week header */}
         <div className="grid grid-cols-7" style={{ backgroundColor: '#f5f7f5', borderBottom: '1px solid #d4e8d4' }}>
           {DIAS_CURTOS.map(d => (
             <div key={d} className="p-2 text-center text-xs font-semibold" style={{ color: '#6b8c6b' }}>{d}</div>
           ))}
         </div>
-
-        {/* Day cells */}
         <div className="grid grid-cols-7">
           {days.map((day, i) => {
-            const dc = forDay(day)
-            const inMonth = isSameMonth(day, current)
+            const dc       = forDay(day)
+            const inMonth  = isSameMonth(day, current)
             const selected = selectedDay && isSameDay(day, selectedDay)
             return (
               <div
@@ -283,10 +406,15 @@ function MonthView({ current, classes }: { current: Date; classes: ClassItem[] }
           {selectedClasses.length === 0 ? (
             <p className="text-sm" style={{ color: '#9dbfa9' }}>Nenhuma aula.</p>
           ) : selectedClasses.map(c => {
-            const st = statusStyle[c.status] ?? statusStyle.agendada
+            const st  = statusStyle[c.status] ?? statusStyle.agendada
             const end = getEndsAt(c)
             return (
-              <div key={c.id} className="flex items-center gap-3 p-3 rounded-lg bg-white border" style={{ borderColor: '#d4e8d4' }}>
+              <div
+                key={c.id}
+                onClick={() => onEventClick(c)}
+                className="flex items-center gap-3 p-3 rounded-lg bg-white border cursor-pointer hover:shadow-sm transition-shadow"
+                style={{ borderColor: '#d4e8d4' }}
+              >
                 <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: st.dot }} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold" style={{ color: '#0d2e1e' }}>
@@ -303,7 +431,6 @@ function MonthView({ current, classes }: { current: Date; classes: ClassItem[] }
         </div>
       )}
 
-      {/* Legenda */}
       <div className="flex gap-4 text-xs" style={{ color: '#6b8c6b' }}>
         {Object.values(statusStyle).map(s => (
           <span key={s.label} className="flex items-center gap-1">
@@ -319,8 +446,10 @@ function MonthView({ current, classes }: { current: Date; classes: ClassItem[] }
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function AulasCalendar({ classes }: { classes: ClassItem[] }) {
-  const [view, setView] = useState<CalView>('mes')
-  const [current, setCurrent] = useState(new Date())
+  const router = useRouter()
+  const [view, setView]               = useState<CalView>('mes')
+  const [current, setCurrent]         = useState(new Date())
+  const [selectedEvent, setSelectedEvent] = useState<ClassItem | null>(null)
 
   const goNext = () => {
     if (view === 'mes')    setCurrent(d => addMonths(d, 1))
@@ -346,22 +475,24 @@ export function AulasCalendar({ classes }: { classes: ClassItem[] }) {
 
   return (
     <div className="space-y-4">
+      {selectedEvent && (
+        <EventPopup
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+          onUpdated={() => router.refresh()}
+        />
+      )}
+
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1">
-          <button
-            onClick={goPrev}
-            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-          >
+          <button onClick={goPrev} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
             <ChevronLeft className="h-4 w-4" style={{ color: '#1e6b40' }} />
           </button>
           <h2 className="text-base font-semibold capitalize px-1 min-w-[200px] text-center" style={{ color: '#0d2e1e' }}>
             {title}
           </h2>
-          <button
-            onClick={goNext}
-            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-          >
+          <button onClick={goNext} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
             <ChevronRight className="h-4 w-4" style={{ color: '#1e6b40' }} />
           </button>
           <button
@@ -373,7 +504,6 @@ export function AulasCalendar({ classes }: { classes: ClassItem[] }) {
           </button>
         </div>
 
-        {/* View toggle */}
         <div className="flex p-0.5 rounded-lg gap-0.5" style={{ backgroundColor: '#f5f7f5', border: '1px solid #d4e8d4' }}>
           {([
             { key: 'mes',    icon: CalendarRange, label: 'Mês'    },
@@ -397,16 +527,9 @@ export function AulasCalendar({ classes }: { classes: ClassItem[] }) {
         </div>
       </div>
 
-      {/* Views */}
-      {view === 'mes' && (
-        <MonthView current={current} classes={classes} />
-      )}
-      {view === 'semana' && (
-        <TimeGrid days={weekDays} classes={classes} />
-      )}
-      {view === 'dia' && (
-        <TimeGrid days={[current]} classes={classes} />
-      )}
+      {view === 'mes'    && <MonthView current={current} classes={classes} onEventClick={setSelectedEvent} />}
+      {view === 'semana' && <TimeGrid days={weekDays}  classes={classes} onEventClick={setSelectedEvent} />}
+      {view === 'dia'    && <TimeGrid days={[current]} classes={classes} onEventClick={setSelectedEvent} />}
     </div>
   )
 }
