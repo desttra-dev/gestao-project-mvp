@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import type { Student, Professor, Enrollment, Class } from '@/lib/types'
-import { createAulaGoogleEvent, notifyProfessorNewAulas, setupAulaZoom } from '@/app/actions/aulas'
+import { createAulaGoogleEvent, setupAulaZoom } from '@/app/actions/aulas'
 import { addDays, addWeeks, addHours, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { CalendarDays, Calendar } from 'lucide-react'
@@ -223,20 +223,22 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
     })
 
     if (selectedProf?.email) {
-      notifyProfessorNewAulas({
-        professorEmail: selectedProf.email,
-        professorName,
-        studentName,
-        level: form.level,
-        subject: form.subject || null,
-        notes: form.notes || null,
-        dates: dates.map(d => ({
-          scheduledAt: d.toISOString(),
-          endsAt: computeEndsAt(d.toISOString(), form.ends_at_time),
-        })),
-      }).catch(err => console.error('[notifyProf] erro:', err))
-    } else {
-      console.warn('[notifyProf] professor sem email, pulando:', form.teacher_id)
+      fetch('/api/aulas/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          professorEmail: selectedProf.email,
+          professorName,
+          studentName,
+          level: form.level,
+          subject: form.subject || null,
+          notes: form.notes || null,
+          dates: dates.map(d => ({
+            scheduledAt: d.toISOString(),
+            endsAt: computeEndsAt(d.toISOString(), form.ends_at_time),
+          })),
+        }),
+      }).catch(err => console.error('[notify] erro:', err))
     }
 
     if (inserted && inserted.length > 0) {
