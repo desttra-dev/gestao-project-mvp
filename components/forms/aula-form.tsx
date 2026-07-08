@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import type { Student, Professor, Enrollment, Class } from '@/lib/types'
-import { createAulaGoogleEvent, setupAulaZoom } from '@/app/actions/aulas'
+import { createAulaGoogleEvent } from '@/app/actions/aulas'
 import { addDays, addWeeks, addHours, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { CalendarDays, Calendar } from 'lucide-react'
@@ -222,27 +222,7 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
       createAulaGoogleEvent({ studentName, professorName, scheduledAt: d.toISOString(), level: form.level, notes: form.notes }).catch(() => {})
     })
 
-    if (selectedProf?.email) {
-      fetch('/api/aulas/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          professorEmail: selectedProf.email,
-          professorName,
-          studentName,
-          level: form.level,
-          subject: form.subject || null,
-          notes: form.notes || null,
-          dates: dates.map(d => ({
-            scheduledAt: d.toISOString(),
-            endsAt: computeEndsAt(d.toISOString(), form.ends_at_time),
-          })),
-        }),
-      }).catch(err => console.error('[notify] erro:', err))
-    }
-
     if (inserted && inserted.length > 0) {
-      // Duração em minutos (fallback 60)
       let durationMinutes = 60
       if (form.ends_at_time && form.scheduled_at) {
         const start = new Date(form.scheduled_at)
@@ -261,20 +241,25 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
         ? `Aula de ${subjectLabel} (${levelLabel}) — ${studentName}`
         : `Aula ${levelLabel} — ${studentName}`
 
-      setupAulaZoom({
-        classes: inserted.map(c => ({ id: c.id, scheduledAt: c.scheduled_at, endsAt: c.ends_at ?? null })),
-        repeatMode: form.repeat,
-        repeatUntil: form.repeat_until || undefined,
-        durationMinutes,
-        topic,
-        professorEmail: selectedProf?.email ?? null,
-        professorName,
-        studentName,
-        studentEmail: selectedStudent?.email ?? null,
-        responsibleEmail: selectedStudent?.responsible_email ?? null,
-        subject: form.subject || null,
-        level: form.level,
-      }).catch(() => {})
+      fetch('/api/aulas/post-create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          classes: inserted.map(c => ({ id: c.id, scheduledAt: c.scheduled_at, endsAt: c.ends_at ?? null })),
+          repeatMode: form.repeat,
+          repeatUntil: form.repeat_until || undefined,
+          durationMinutes,
+          topic,
+          professorEmail: selectedProf?.email ?? null,
+          professorName,
+          studentName,
+          studentEmail: selectedStudent?.email ?? null,
+          responsibleEmail: selectedStudent?.responsible_email ?? null,
+          subject: form.subject || null,
+          level: form.level,
+          notes: form.notes || null,
+        }),
+      }).catch(err => console.error('[post-create] erro:', err))
     }
 
     router.push('/aulas')
