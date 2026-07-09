@@ -38,12 +38,16 @@ export function AlunoForm({ student }: { student?: Student }) {
     country:            student?.country ?? 'BR',
     status:             student?.status ?? 'ativo',
     notes:              student?.notes ?? '',
+    cep:                student?.cep ?? '',
+    address:            student?.address ?? '',
     responsible_name:   student?.responsible_name ?? '',
     responsible_phone:  student?.responsible_phone ?? '',
     responsible_email:  student?.responsible_email ?? '',
+    responsible_cpf:    student?.responsible_cpf ?? '',
     follow_up:          student?.follow_up ?? 'none',
     follow_up_notes:    student?.follow_up_notes ?? '',
   })
+  const [cepLoading, setCepLoading] = useState(false)
 
   const selectedCountry = countryByCode[form.country]
 
@@ -54,6 +58,24 @@ export function AlunoForm({ student }: { student?: Student }) {
       setDetectedCountry(detected)
     } else {
       setDetectedCountry(null)
+    }
+  }
+
+  const handleCepChange = async (cep: string) => {
+    const digits = cep.replace(/\D/g, '')
+    setForm(f => ({ ...f, cep }))
+    if (digits.length === 8) {
+      setCepLoading(true)
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`)
+        const data = await res.json()
+        if (!data.erro) {
+          const parts = [data.logradouro, data.bairro, data.localidade, data.uf].filter(Boolean)
+          setForm(f => ({ ...f, cep, address: parts.join(', ') }))
+        }
+      } catch { /* ignora */ } finally {
+        setCepLoading(false)
+      }
     }
   }
 
@@ -76,9 +98,12 @@ export function AlunoForm({ student }: { student?: Student }) {
       status:             form.status,
       active:             form.status === 'ativo',
       notes:              form.notes || null,
+      cep:                form.cep || null,
+      address:            form.address || null,
       responsible_name:   form.responsible_name || null,
       responsible_phone:  form.responsible_phone || null,
       responsible_email:  form.responsible_email || null,
+      responsible_cpf:    form.responsible_cpf || null,
       follow_up:          form.follow_up,
       follow_up_notes:    form.follow_up_notes || null,
     }
@@ -177,6 +202,35 @@ export function AlunoForm({ student }: { student?: Student }) {
               </div>
             </div>
 
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="cep">CEP</Label>
+                <div className="relative">
+                  <Input
+                    id="cep"
+                    value={form.cep}
+                    onChange={e => handleCepChange(e.target.value)}
+                    placeholder="00000-000"
+                    maxLength={9}
+                  />
+                  {cepLoading && (
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs" style={{ color: '#6b8c6b' }}>
+                      buscando...
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="address">Endereço</Label>
+                <Input
+                  id="address"
+                  value={form.address}
+                  onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
+                  placeholder="Rua, número, bairro, cidade"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="notes">Observações</Label>
               <Textarea id="notes" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} />
@@ -205,6 +259,16 @@ export function AlunoForm({ student }: { student?: Student }) {
                 <Input id="responsible_email" type="email" value={form.responsible_email}
                   onChange={e => setForm(f => ({ ...f, responsible_email: e.target.value }))} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="responsible_cpf">CPF do Responsável</Label>
+              <Input
+                id="responsible_cpf"
+                value={form.responsible_cpf}
+                onChange={e => setForm(f => ({ ...f, responsible_cpf: e.target.value }))}
+                placeholder="000.000.000-00"
+                maxLength={14}
+              />
             </div>
           </div>
 

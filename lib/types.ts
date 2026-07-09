@@ -34,6 +34,9 @@ export interface Student {
   responsible_name: string | null
   responsible_phone: string | null
   responsible_email: string | null
+  responsible_cpf: string | null
+  cep: string | null
+  address: string | null
   follow_up: FollowUp
   follow_up_notes: string | null
   created_at: string
