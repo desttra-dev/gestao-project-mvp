@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
 import { toBRT } from '@/lib/date-utils'
@@ -183,4 +185,9 @@ export async function POST(request: Request) {
   await Promise.allSettled(emailJobs)
 
   return Response.json({ ok: true })
+}
+
+// Permite verificar se o endpoint está online
+export async function GET() {
+  return Response.json({ ok: true, endpoint: 'zoom-webhook', secret: !!process.env.ZOOM_WEBHOOK_SECRET_TOKEN })
 }
