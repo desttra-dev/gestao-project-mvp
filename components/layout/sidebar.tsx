@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
-  DollarSign, CreditCard, Settings, LogOut,
+  DollarSign, Settings, LogOut,
   ChevronDown, BookCheck, ArrowLeftRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -17,15 +17,7 @@ const navItems = [
   { label: 'Alunos', href: '/alunos', icon: Users },
   { label: 'Professores', href: '/professores', icon: GraduationCap },
   { label: 'Aulas', href: '/aulas', icon: BookOpen },
-  {
-    label: 'Financeiro',
-    icon: DollarSign,
-    children: [
-      { label: 'Lançamentos', href: '/financeiro/lancamentos', icon: ArrowLeftRight },
-      { label: 'Cobranças', href: '/financeiro/cobrancas', icon: CreditCard },
-      { label: 'Repasses', href: '/financeiro/repasses', icon: DollarSign },
-    ],
-  },
+  { label: 'Financeiro', href: '/financeiro/lancamentos', icon: ArrowLeftRight },
   {
     label: 'Configurações',
     icon: Settings,

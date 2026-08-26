@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { ExportCsvButton } from '@/components/ui/export-csv-button'
 import Link from 'next/link'
 import { Plus, Pencil } from 'lucide-react'
 
@@ -22,12 +23,15 @@ export default async function ProfessoresPage() {
           <h1 className="text-2xl font-bold text-slate-900">Professores</h1>
           <p className="text-sm text-slate-500 mt-1">{professors?.length ?? 0} cadastrados</p>
         </div>
-        <Link href="/professores/novo">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Professor
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <ExportCsvButton href="/api/professores/export" />
+          <Link href="/professores/novo">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Professor
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <Card>

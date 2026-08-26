@@ -76,3 +76,16 @@ export async function createZoomMeeting({
   const data = await res.json()
   return { meetingId: String(data.id), joinUrl: data.join_url }
 }
+
+export async function getZoomRecording(meetingId: string): Promise<{ shareUrl: string } | null> {
+  const token = await getZoomToken()
+  if (!token) return null
+
+  const res = await fetch(`https://api.zoom.us/v2/meetings/${meetingId}/recordings`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) return null
+  const data = await res.json()
+  if (!data.share_url) return null
+  return { shareUrl: data.share_url as string }
+}

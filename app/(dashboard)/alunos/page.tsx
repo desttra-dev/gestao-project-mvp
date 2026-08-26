@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlunosFiltros } from '@/components/ui/alunos-filtros'
+import { ExportCsvButton } from '@/components/ui/export-csv-button'
 import Link from 'next/link'
 import { Plus, Pencil } from 'lucide-react'
 import { countryByCode } from '@/lib/countries'
@@ -57,9 +58,12 @@ export default async function AlunosPage({
             {retornos > 0 && <> · <span style={{ color: '#b45309', fontWeight: 600 }}>{retornos} com retorno agendado</span></>}
           </p>
         </div>
-        <Link href="/alunos/novo">
-          <Button><Plus className="h-4 w-4 mr-2" />Novo Aluno</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <ExportCsvButton href={`/api/alunos/export${status || q ? `?${new URLSearchParams({ ...(status ? { status } : {}), ...(q ? { q } : {}) })}` : ''}`} />
+          <Link href="/alunos/novo">
+            <Button><Plus className="h-4 w-4 mr-2" />Novo Aluno</Button>
+          </Link>
+        </div>
       </div>
 
       <Suspense>

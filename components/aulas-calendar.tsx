@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, format, isSameMonth, isSameDay, isToday,
@@ -16,12 +15,13 @@ import { toast } from 'sonner'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const HOUR_H  = 60
+const HOUR_H  = 60   // px per hour
 const START_H = 7
 const END_H   = 23
 const TOTAL_H = END_H - START_H
 const HOURS   = Array.from({ length: TOTAL_H }, (_, i) => START_H + i)
 const DIAS_CURTOS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+const LABEL_W = 56  // px — width of the hour labels column (w-14)
 
 const subjectLabels: Record<string, string> = {
   matematica: 'Matemática', fisica: 'Física', quimica: 'Química', portugues: 'Português',
@@ -52,6 +52,13 @@ interface ClassItem {
 
 type CalView = 'mes' | 'semana' | 'dia'
 
+interface DragState {
+  event: ClassItem
+  offsetY: number           // pixels into the event where the grab happened
+  previewDay: Date
+  previewMinutes: number    // minutes from START_H*60 (0 = 07:00)
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getEndsAt(c: ClassItem): Date {
@@ -71,6 +78,10 @@ function currentTimeTop(now: Date) {
   return (getHours(now) + getMinutes(now) / 60 - START_H) * HOUR_H
 }
 
+function snapMinutes(raw: number): number {
+  return Math.round(raw / 15) * 15
+}
+
 // ─── Event Popup ──────────────────────────────────────────────────────────────
 
 function EventPopup({
@@ -83,7 +94,6 @@ function EventPopup({
   onUpdated: () => void
 }) {
   const router = useRouter()
-  const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const start = new Date(event.scheduled_at)
   const end   = getEndsAt(event)
@@ -91,9 +101,13 @@ function EventPopup({
 
   const marcarRealizada = async () => {
     setLoading(true)
-    const { error } = await supabase.from('classes').update({ status: 'realizada' }).eq('id', event.id)
+    const res = await fetch('/api/aulas/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aulaId: event.id }),
+    })
     setLoading(false)
-    if (error) { toast.error('Erro ao atualizar'); return }
+    if (!res.ok) { toast.error('Erro ao atualizar'); return }
     toast.success('Aula marcada como realizada!')
     onClose()
     onUpdated()
@@ -119,7 +133,6 @@ function EventPopup({
         style={{ border: '1px solid #d4e8d4' }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div>
             <p className="font-semibold text-base" style={{ color: '#0d2e1e' }}>
@@ -137,7 +150,6 @@ function EventPopup({
           </button>
         </div>
 
-        {/* Details */}
         <div className="rounded-lg p-3 mb-4 space-y-1" style={{ backgroundColor: '#f5f7f5' }}>
           <p className="text-xs" style={{ color: '#4a5a4a' }}>
             <span style={{ color: '#6b8c6b' }}>Professor: </span>
@@ -160,7 +172,6 @@ function EventPopup({
           </div>
         </div>
 
-        {/* Actions */}
         <div className="space-y-2">
           <button
             onClick={() => router.push(`/aulas/${event.id}`)}
@@ -200,19 +211,24 @@ function EventPopup({
   )
 }
 
-// ─── Time Grid (Week & Day) ───────────────────────────────────────────────────
+// ─── Time Grid (Week & Day) with drag-and-drop ────────────────────────────────
 
 function TimeGrid({
   days,
   classes,
   onEventClick,
+  onRefresh,
 }: {
   days: Date[]
   classes: ClassItem[]
   onEventClick: (c: ClassItem) => void
+  onRefresh: () => void
 }) {
-  const [now, setNow] = useState(new Date())
+  const [now, setNow]       = useState(new Date())
+  const [drag, setDrag]     = useState<DragState | null>(null)
+  const [saving, setSaving] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const gridRef   = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60_000)
@@ -229,11 +245,103 @@ function TimeGrid({
 
   const forDay = (d: Date) => classes.filter(c => isSameDay(new Date(c.scheduled_at), d))
 
+  // ── drag helpers ────────────────────────────────────────────────────────────
+
+  const startDrag = (e: React.PointerEvent<HTMLDivElement>, c: ClassItem) => {
+    if (c.status === 'cancelada') return
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const rect = e.currentTarget.getBoundingClientRect()
+    const start = new Date(c.scheduled_at)
+    setDrag({
+      event: c,
+      offsetY: e.clientY - rect.top,
+      previewDay: start,
+      previewMinutes: (getHours(start) - START_H) * 60 + getMinutes(start),
+    })
+  }
+
+  const onDragMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!drag || !gridRef.current) return
+    const gridRect = gridRef.current.getBoundingClientRect()
+
+    // Which day column?
+    const colZone   = gridRect.width - LABEL_W
+    const colWidth  = colZone / days.length
+    const colIndex  = Math.max(0, Math.min(days.length - 1,
+      Math.floor((e.clientX - gridRect.left - LABEL_W) / colWidth),
+    ))
+
+    // Which time row? (account for scroll)
+    const scrollTop = scrollRef.current?.scrollTop ?? 0
+    const relY = (e.clientY - gridRect.top) + scrollTop - drag.offsetY
+    const rawMins = relY / HOUR_H * 60
+    const snapped = snapMinutes(rawMins)
+    const clamped = Math.max(0, Math.min(snapped, (TOTAL_H - 1) * 60))
+
+    setDrag(d => d ? { ...d, previewDay: days[colIndex], previewMinutes: clamped } : d)
+  }
+
+  const onDragEnd = async (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!drag) return
+    const { event, previewDay, previewMinutes } = drag
+    setDrag(null)
+
+    const origStart = new Date(event.scheduled_at)
+    const origEnd   = getEndsAt(event)
+    const durationMs = origEnd.getTime() - origStart.getTime()
+
+    const newHour = Math.floor(previewMinutes / 60) + START_H
+    const newMin  = previewMinutes % 60
+
+    // Build new date keeping previewDay's date + new local time
+    // setHours uses local browser time (BRT in Brazil), which is what we want
+    const newStart = new Date(previewDay)
+    newStart.setHours(newHour, newMin, 0, 0)
+    const newEnd = new Date(newStart.getTime() + durationMs)
+
+    // Skip if time didn't change
+    if (newStart.toISOString() === origStart.toISOString()) return
+
+    setSaving(true)
+    const res = await fetch('/api/aulas/reschedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        aulaId: event.id,
+        scheduledAt: newStart.toISOString(),
+        endsAt: newEnd.toISOString(),
+      }),
+    })
+    setSaving(false)
+    if (!res.ok) { toast.error('Erro ao reagendar aula'); return }
+    toast.success(`Aula movida para ${format(newStart, "EEE dd/MM 'às' HH:mm", { locale: ptBR })}`)
+    onRefresh()
+  }
+
+  // ── preview ghost position ──────────────────────────────────────────────────
+
+  const dragPreview = drag ? (() => {
+    const origStart = new Date(drag.event.scheduled_at)
+    const origEnd   = getEndsAt(drag.event)
+    const durH = (origEnd.getTime() - origStart.getTime()) / 3_600_000
+    const top    = drag.previewMinutes / 60 * HOUR_H
+    const height = Math.max(durH * HOUR_H, 22)
+    const colIndex = days.findIndex(d => isSameDay(d, drag.previewDay))
+    return { top, height, colIndex }
+  })() : null
+
   return (
-    <div className="flex flex-col" style={{ border: '1px solid #d4e8d4', borderRadius: 12, overflow: 'hidden' }}>
+    <div className="flex flex-col relative" style={{ border: '1px solid #d4e8d4', borderRadius: 12, overflow: 'hidden' }}>
+      {saving && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-white/60">
+          <span className="text-sm" style={{ color: '#1e6b40' }}>Salvando…</span>
+        </div>
+      )}
+
       {/* Day header */}
       <div className="flex" style={{ borderBottom: '1px solid #d4e8d4', backgroundColor: '#f5f7f5' }}>
-        <div className="w-14 flex-shrink-0" />
+        <div className="flex-shrink-0" style={{ width: LABEL_W }} />
         {days.map((d, i) => (
           <div key={i} className="flex-1 text-center py-2" style={{ borderLeft: '1px solid #d4e8d4' }}>
             <p className="text-xs font-medium" style={{ color: '#6b8c6b' }}>{DIAS_CURTOS[d.getDay()]}</p>
@@ -252,9 +360,9 @@ function TimeGrid({
 
       {/* Scrollable grid */}
       <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: 560 }}>
-        <div className="flex relative" style={{ height: TOTAL_H * HOUR_H }}>
+        <div ref={gridRef} className="flex relative" style={{ height: TOTAL_H * HOUR_H }}>
           {/* Hour labels */}
-          <div className="w-14 flex-shrink-0 relative">
+          <div className="flex-shrink-0 relative" style={{ width: LABEL_W }}>
             {HOURS.map(h => (
               <div
                 key={h}
@@ -282,21 +390,51 @@ function TimeGrid({
                     </div>
                   </div>
                 )}
+
+                {/* Preview ghost */}
+                {drag && dragPreview && dragPreview.colIndex === di && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: dragPreview.top + 1,
+                      left: 3, right: 3,
+                      height: dragPreview.height - 2,
+                      backgroundColor: '#1e6b40',
+                      opacity: 0.25,
+                      borderRadius: 4,
+                      border: '2px dashed #1e6b40',
+                      zIndex: 20,
+                      pointerEvents: 'none',
+                    }}
+                  />
+                )}
+
                 {dayClasses.map(c => {
                   const start = new Date(c.scheduled_at)
                   const end   = getEndsAt(c)
                   const { top, height } = eventPosition(start, end)
                   const st = statusStyle[c.status] ?? statusStyle.agendada
+                  const isDragging = drag?.event.id === c.id
                   return (
                     <div
                       key={c.id}
-                      onClick={() => onEventClick(c)}
+                      onPointerDown={e => startDrag(e, c)}
+                      onPointerMove={onDragMove}
+                      onPointerUp={onDragEnd}
+                      onClick={() => !drag && onEventClick(c)}
                       style={{
                         position: 'absolute', top: top + 1, left: 3, right: 3, height: height - 2,
-                        backgroundColor: st.bg, color: st.text,
-                        borderLeft: `3px solid ${st.border}`,
+                        backgroundColor: isDragging ? 'transparent' : st.bg,
+                        color: st.text,
+                        borderLeft: isDragging ? 'none' : `3px solid ${st.border}`,
+                        border: isDragging ? '2px dashed #1e6b40' : undefined,
                         borderRadius: 4, padding: '2px 5px',
-                        overflow: 'hidden', cursor: 'pointer', zIndex: 5,
+                        overflow: 'hidden',
+                        cursor: c.status === 'cancelada' ? 'pointer' : 'grab',
+                        zIndex: isDragging ? 25 : 5,
+                        opacity: isDragging ? 0.5 : 1,
+                        userSelect: 'none',
+                        touchAction: 'none',
                       }}
                     >
                       <p className="text-xs font-semibold leading-tight truncate">
@@ -397,7 +535,6 @@ function MonthView({
         </div>
       </div>
 
-      {/* Selected day detail */}
       {selectedDay && (
         <div className="rounded-xl border p-4 space-y-2" style={{ borderColor: '#d4e8d4', backgroundColor: '#f5f7f5' }}>
           <p className="font-semibold capitalize text-sm" style={{ color: '#1e6b40' }}>
@@ -438,6 +575,7 @@ function MonthView({
             {s.label}
           </span>
         ))}
+        <span className="ml-auto italic">Arraste eventos na vista semana/dia para reagendar</span>
       </div>
     </div>
   )
@@ -447,7 +585,7 @@ function MonthView({
 
 export function AulasCalendar({ classes }: { classes: ClassItem[] }) {
   const router = useRouter()
-  const [view, setView]               = useState<CalView>('mes')
+  const [view, setView]               = useState<CalView>('semana')
   const [current, setCurrent]         = useState(new Date())
   const [selectedEvent, setSelectedEvent] = useState<ClassItem | null>(null)
 
@@ -528,8 +666,8 @@ export function AulasCalendar({ classes }: { classes: ClassItem[] }) {
       </div>
 
       {view === 'mes'    && <MonthView current={current} classes={classes} onEventClick={setSelectedEvent} />}
-      {view === 'semana' && <TimeGrid days={weekDays}  classes={classes} onEventClick={setSelectedEvent} />}
-      {view === 'dia'    && <TimeGrid days={[current]} classes={classes} onEventClick={setSelectedEvent} />}
+      {view === 'semana' && <TimeGrid days={weekDays}  classes={classes} onEventClick={setSelectedEvent} onRefresh={() => router.refresh()} />}
+      {view === 'dia'    && <TimeGrid days={[current]} classes={classes} onEventClick={setSelectedEvent} onRefresh={() => router.refresh()} />}
     </div>
   )
 }

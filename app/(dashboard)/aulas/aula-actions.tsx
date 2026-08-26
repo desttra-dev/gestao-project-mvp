@@ -2,12 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { MoreHorizontal, CheckCircle, XCircle, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
-import { cancelAulaComEmail } from '@/app/actions/aulas'
 
 interface AulaActionsProps {
   aulaId: string
@@ -16,26 +14,30 @@ interface AulaActionsProps {
 
 export function AulaActions({ aulaId, status }: AulaActionsProps) {
   const router = useRouter()
-  const supabase = createClient()
   const [loading, setLoading] = useState(false)
 
   const marcarRealizada = async () => {
     setLoading(true)
-    const { error } = await supabase
-      .from('classes')
-      .update({ status: 'realizada' })
-      .eq('id', aulaId)
+    const res = await fetch('/api/aulas/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aulaId }),
+    })
     setLoading(false)
-    if (error) { toast.error('Erro ao atualizar status'); return }
+    if (!res.ok) { toast.error('Erro ao atualizar status'); return }
     toast.success('Aula marcada como realizada!')
     router.refresh()
   }
 
   const cancelar = async () => {
     setLoading(true)
-    const { error } = await cancelAulaComEmail(aulaId)
+    const res = await fetch('/api/aulas/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aulaId }),
+    })
     setLoading(false)
-    if (error) { toast.error('Erro ao cancelar: ' + error); return }
+    if (!res.ok) { toast.error('Erro ao cancelar aula'); return }
     toast.success('Aula cancelada. Professor notificado por email.')
     router.refresh()
   }

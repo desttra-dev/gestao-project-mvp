@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createZoomMeeting } from '@/lib/zoom'
 import { sendEmail } from '@/lib/email'
+import { toBRT } from '@/lib/date-utils'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -147,7 +148,7 @@ export async function POST(request: Request) {
   ].join('')
 
   const dateRows = classes.map((c, i) => {
-    const start   = new Date(c.scheduledAt)
+    const start   = toBRT(c.scheduledAt)
     const dateStr = format(start, "EEEE, dd/MM/yyyy", { locale: ptBR })
     const startHr = format(start, 'HH:mm')
     const endHr   = c.endsAt ? format(new Date(c.endsAt), 'HH:mm') : null
@@ -204,6 +205,24 @@ export async function POST(request: Request) {
       }),
     }))
   }
+
+  // Gestão sempre recebe cópia
+  emailPromises.push(sendEmail({
+    to: 'gestao@desttra.com',
+    subject: isSeries
+      ? `[Nova Série] ${studentName} — ${classes.length} aulas com ${professorName}`
+      : `[Nova Aula] ${studentName} com ${professorName}`,
+    html: buildEmail({
+      greeting: `Gestão Desttra`,
+      intro: isSeries
+        ? `Uma série de <strong>${classes.length} aulas</strong> foi agendada. Aluno: <strong>${studentName}</strong> · Prof.: <strong>${professorName}</strong>.`
+        : `Uma nova aula foi agendada. Aluno: <strong>${studentName}</strong> · Prof.: <strong>${professorName}</strong>.`,
+      detailsRows,
+      dateRows,
+      zoomUrl: joinUrl,
+      isSeries,
+    }),
+  }))
 
   await Promise.allSettled(emailPromises)
 
