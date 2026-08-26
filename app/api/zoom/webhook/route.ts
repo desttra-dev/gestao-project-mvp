@@ -24,12 +24,6 @@ function verifyZoomSignature(body: string, timestamp: string, signature: string)
 
 export async function POST(request: Request) {
   const rawBody = await request.text()
-  const timestamp = request.headers.get('x-zm-request-timestamp') ?? ''
-  const signature = request.headers.get('x-zm-signature') ?? ''
-
-  if (!verifyZoomSignature(rawBody, timestamp, signature)) {
-    return Response.json({ error: 'signature inválida' }, { status: 401 })
-  }
 
   const data = JSON.parse(rawBody) as {
     event: string
@@ -43,13 +37,21 @@ export async function POST(request: Request) {
     }
   }
 
-  // URL validation handshake
+  // URL validation handshake — responde ANTES de verificar assinatura
   if (data.event === 'endpoint.url_validation' && data.payload?.plainToken) {
-    const secret = process.env.ZOOM_WEBHOOK_SECRET_TOKEN!
+    const secret = process.env.ZOOM_WEBHOOK_SECRET_TOKEN
+    if (!secret) return Response.json({ error: 'ZOOM_WEBHOOK_SECRET_TOKEN não configurado' }, { status: 500 })
     const encryptedToken = createHmac('sha256', secret)
       .update(data.payload.plainToken)
       .digest('hex')
     return Response.json({ plainToken: data.payload.plainToken, encryptedToken })
+  }
+
+  // Para todos os outros eventos, verifica assinatura
+  const timestamp = request.headers.get('x-zm-request-timestamp') ?? ''
+  const signature = request.headers.get('x-zm-signature') ?? ''
+  if (!verifyZoomSignature(rawBody, timestamp, signature)) {
+    return Response.json({ error: 'signature inválida' }, { status: 401 })
   }
 
   if (data.event !== 'recording.completed') {
