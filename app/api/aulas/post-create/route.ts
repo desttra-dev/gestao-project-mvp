@@ -151,7 +151,7 @@ export async function POST(request: Request) {
     const start   = toBRT(c.scheduledAt)
     const dateStr = format(start, "EEEE, dd/MM/yyyy", { locale: ptBR })
     const startHr = format(start, 'HH:mm')
-    const endHr   = c.endsAt ? format(new Date(c.endsAt), 'HH:mm') : null
+    const endHr   = c.endsAt ? format(toBRT(c.endsAt), 'HH:mm') : null
     const time    = endHr ? `${startHr} – ${endHr}` : startHr
     return `
       <tr style="border-bottom:1px solid #e8f0e8;">
