@@ -587,7 +587,7 @@ function MonthView({
 
 export function AulasCalendar({ classes }: { classes: ClassItem[] }) {
   const router = useRouter()
-  const [view, setView]               = useState<CalView>('semana')
+  const [view, setView]               = useState<CalView>('dia')
   const [current, setCurrent]         = useState(new Date())
   const [selectedEvent, setSelectedEvent] = useState<ClassItem | null>(null)
 

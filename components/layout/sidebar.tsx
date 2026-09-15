@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
   DollarSign, Settings, LogOut,
-  ChevronDown, BookCheck, ArrowLeftRight, Menu, X,
+  ChevronDown, BookCheck, Menu, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -17,7 +17,6 @@ const navItems = [
   { label: 'Alunos',      href: '/alunos',                    icon: Users           },
   { label: 'Professores', href: '/professores',               icon: GraduationCap   },
   { label: 'Aulas',       href: '/aulas',                     icon: BookOpen        },
-  { label: 'Financeiro',  href: '/financeiro/lancamentos',    icon: ArrowLeftRight  },
   {
     label: 'Configurações',
     icon: Settings,
