@@ -30,10 +30,10 @@ const SUBJECTS = [
 ]
 
 const LEVELS = [
-  { value: 'fundamental',   label: 'Fundamental'   },
-  { value: 'medio',         label: 'Médio'         },
-  { value: 'superior',      label: 'Superior'      },
-  { value: 'internacional', label: 'Internacional' },
+  { value: 'fundamental'   as const, label: 'Fundamental'   },
+  { value: 'medio'         as const, label: 'Médio'         },
+  { value: 'superior'      as const, label: 'Superior'      },
+  { value: 'internacional' as const, label: 'Internacional' },
 ]
 
 const DURATIONS = [
