@@ -51,12 +51,12 @@ export default async function LancamentosPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-h1">Lançamentos</h1>
           <p className="text-body mt-1" style={{ color: '#6b8c6b' }}>{periodoLabel} · {transactions?.length ?? 0} registros</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <LancamentosExport />
           <Link href="/financeiro/lancamentos/novo">
             <Button><Plus className="h-4 w-4 mr-2" />Novo Lançamento</Button>
@@ -70,7 +70,7 @@ export default async function LancamentosPage({
       </Suspense>
 
       {/* Resumo do período */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-5">
             <div className="flex items-center gap-2 mb-1">
@@ -101,8 +101,8 @@ export default async function LancamentosPage({
       </div>
 
       <Card>
-        <CardContent className="p-0">
-          <Table>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table className="min-w-[640px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>

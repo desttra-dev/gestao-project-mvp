@@ -331,8 +331,10 @@ function TimeGrid({
     return { top, height, colIndex }
   })() : null
 
+  const minW = LABEL_W + days.length * 80
+
   return (
-    <div className="flex flex-col relative" style={{ border: '1px solid #d4e8d4', borderRadius: 12, overflow: 'hidden' }}>
+    <div className="flex flex-col relative" style={{ border: '1px solid #d4e8d4', borderRadius: 12, overflow: 'hidden', minWidth: minW }}>
       {saving && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-white/60">
           <span className="text-sm" style={{ color: '#1e6b40' }}>Salvando…</span>
@@ -575,7 +577,7 @@ function MonthView({
             {s.label}
           </span>
         ))}
-        <span className="ml-auto italic">Arraste eventos na vista semana/dia para reagendar</span>
+        <span className="ml-auto italic hidden sm:inline">Arraste eventos na vista semana/dia para reagendar</span>
       </div>
     </div>
   )
@@ -666,8 +668,16 @@ export function AulasCalendar({ classes }: { classes: ClassItem[] }) {
       </div>
 
       {view === 'mes'    && <MonthView current={current} classes={classes} onEventClick={setSelectedEvent} />}
-      {view === 'semana' && <TimeGrid days={weekDays}  classes={classes} onEventClick={setSelectedEvent} onRefresh={() => router.refresh()} />}
-      {view === 'dia'    && <TimeGrid days={[current]} classes={classes} onEventClick={setSelectedEvent} onRefresh={() => router.refresh()} />}
+      {view === 'semana' && (
+        <div className="overflow-x-auto -mx-1 px-1">
+          <TimeGrid days={weekDays}  classes={classes} onEventClick={setSelectedEvent} onRefresh={() => router.refresh()} />
+        </div>
+      )}
+      {view === 'dia'    && (
+        <div className="overflow-x-auto -mx-1 px-1">
+          <TimeGrid days={[current]} classes={classes} onEventClick={setSelectedEvent} onRefresh={() => router.refresh()} />
+        </div>
+      )}
     </div>
   )
 }

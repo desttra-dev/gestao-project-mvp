@@ -87,7 +87,7 @@ export function TransacaoForm({ students, professors, transaction }: Props) {
 
           {/* Tipo e valor */}
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setForm(f => ({ ...f, type: 'entrada' }))}
@@ -114,7 +114,7 @@ export function TransacaoForm({ students, professors, transaction }: Props) {
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="col-span-2 space-y-2">
                 <Label>Valor *</Label>
                 <Input type="number" step="0.01" min="0" value={form.amount}
@@ -133,7 +133,7 @@ export function TransacaoForm({ students, professors, transaction }: Props) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Data *</Label>
                 <Input type="date" value={form.transaction_date}
@@ -173,7 +173,7 @@ export function TransacaoForm({ students, professors, transaction }: Props) {
             </p>
 
             {isEntrada ? (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Aluno</Label>
                   <Select value={form.student_id} onValueChange={v => { if (v) setForm(f => ({ ...f, student_id: v })) }}>

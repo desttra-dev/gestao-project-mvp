@@ -5,34 +5,34 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
   DollarSign, Settings, LogOut,
-  ChevronDown, BookCheck, ArrowLeftRight,
+  ChevronDown, BookCheck, ArrowLeftRight, Menu, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const navItems = [
-  { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { label: 'Alunos', href: '/alunos', icon: Users },
-  { label: 'Professores', href: '/professores', icon: GraduationCap },
-  { label: 'Aulas', href: '/aulas', icon: BookOpen },
-  { label: 'Financeiro', href: '/financeiro/lancamentos', icon: ArrowLeftRight },
+  { label: 'Dashboard',   href: '/',                          icon: LayoutDashboard },
+  { label: 'Alunos',      href: '/alunos',                    icon: Users           },
+  { label: 'Professores', href: '/professores',               icon: GraduationCap   },
+  { label: 'Aulas',       href: '/aulas',                     icon: BookOpen        },
+  { label: 'Financeiro',  href: '/financeiro/lancamentos',    icon: ArrowLeftRight  },
   {
     label: 'Configurações',
     icon: Settings,
     children: [
-      { label: 'Planos', href: '/configuracoes/planos', icon: BookCheck },
-      { label: 'Taxas de Repasse', href: '/configuracoes/taxas', icon: DollarSign },
+      { label: 'Planos',          href: '/configuracoes/planos', icon: BookCheck   },
+      { label: 'Taxas de Repasse', href: '/configuracoes/taxas', icon: DollarSign  },
     ],
   },
 ]
 
-export function Sidebar() {
+function NavContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const [openGroups, setOpenGroups] = useState<string[]>(['Financeiro', 'Configurações'])
+  const [openGroups, setOpenGroups] = useState<string[]>(['Configurações'])
 
   const toggleGroup = (label: string) => {
     setOpenGroups(prev =>
@@ -46,16 +46,11 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-60 min-h-screen flex flex-col" style={{ backgroundColor: '#0d2e1e' }}>
-      <div className="px-6 py-5 border-b" style={{ borderColor: '#1a4a2e' }}>
-        <h1 className="text-base font-extrabold" style={{ color: '#e8faf0' }}>Desttra Educação</h1>
-        <p className="text-xs mt-0.5" style={{ color: '#6b9e7a' }}>Gestão de Aulas</p>
-      </div>
-
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
+    <>
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {navItems.map((item) => {
           if (item.children) {
-            const isOpen = openGroups.includes(item.label)
+            const isOpen   = openGroups.includes(item.label)
             const isActive = item.children.some(c => pathname.startsWith(c.href))
             return (
               <div key={item.label}>
@@ -78,6 +73,7 @@ export function Sidebar() {
                         <Link
                           key={child.href}
                           href={child.href}
+                          onClick={onNavigate}
                           className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors"
                           style={{
                             backgroundColor: active ? '#1e6b40' : 'transparent',
@@ -101,6 +97,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href!}
+              onClick={onNavigate}
               className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-semibold transition-colors"
               style={{
                 backgroundColor: active ? '#1e6b40' : 'transparent',
@@ -124,6 +121,90 @@ export function Sidebar() {
           Sair
         </button>
       </div>
-    </aside>
+    </>
+  )
+}
+
+export function Sidebar() {
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const pathname = usePathname()
+
+  // Fecha o menu mobile ao navegar
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
+
+  const logoBlock = (
+    <div className="px-6 py-5 border-b flex-shrink-0" style={{ borderColor: '#1a4a2e' }}>
+      <h1 className="text-base font-extrabold" style={{ color: '#e8faf0' }}>Desttra Educação</h1>
+      <p className="text-xs mt-0.5" style={{ color: '#6b9e7a' }}>Gestão de Aulas</p>
+    </div>
+  )
+
+  return (
+    <>
+      {/* ── Barra mobile (topo fixo) ────────────────────────────────── */}
+      <div
+        className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center h-14 px-4 border-b"
+        style={{ backgroundColor: '#0d2e1e', borderColor: '#1a4a2e' }}
+      >
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="p-1.5 rounded-md"
+          style={{ color: '#9dbfa9' }}
+          aria-label="Abrir menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <span className="ml-3 text-base font-extrabold" style={{ color: '#e8faf0' }}>
+          Desttra Educação
+        </span>
+      </div>
+
+      {/* ── Sidebar desktop (fixa, sempre visível) ──────────────────── */}
+      <aside
+        className="hidden lg:flex w-60 min-h-screen flex-col fixed left-0 top-0 bottom-0 z-30"
+        style={{ backgroundColor: '#0d2e1e' }}
+      >
+        {logoBlock}
+        <NavContent />
+      </aside>
+
+      {/* ── Overlay mobile ──────────────────────────────────────────── */}
+      {mobileOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-40 bg-black/50"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* ── Drawer mobile ───────────────────────────────────────────── */}
+      <aside
+        className={cn(
+          'lg:hidden fixed left-0 top-0 bottom-0 z-50 w-72 flex flex-col transition-transform duration-300',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full',
+        )}
+        style={{ backgroundColor: '#0d2e1e' }}
+      >
+        <div
+          className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0"
+          style={{ borderColor: '#1a4a2e' }}
+        >
+          <div>
+            <h1 className="text-base font-extrabold" style={{ color: '#e8faf0' }}>Desttra Educação</h1>
+            <p className="text-xs mt-0.5" style={{ color: '#6b9e7a' }}>Gestão de Aulas</p>
+          </div>
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="p-1.5 rounded-md"
+            style={{ color: '#9dbfa9' }}
+            aria-label="Fechar menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <NavContent onNavigate={() => setMobileOpen(false)} />
+      </aside>
+    </>
   )
 }

@@ -139,7 +139,7 @@ export function AlunoForm({ student }: { student?: Student }) {
               <Input id="name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="email">E-mail</Label>
                 <Input id="email" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
@@ -167,7 +167,7 @@ export function AlunoForm({ student }: { student?: Student }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>País</Label>
                 <Select value={form.country} onValueChange={v => { if (v) setForm(f => ({ ...f, country: v })) }}>
@@ -202,7 +202,7 @@ export function AlunoForm({ student }: { student?: Student }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="cep">CEP</Label>
                 <div className="relative">
@@ -248,7 +248,7 @@ export function AlunoForm({ student }: { student?: Student }) {
                 onChange={e => setForm(f => ({ ...f, responsible_name: e.target.value }))}
                 placeholder="Deixe em branco se o aluno é o próprio responsável" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="responsible_phone">WhatsApp do Responsável</Label>
                 <Input id="responsible_phone" value={form.responsible_phone}
@@ -277,7 +277,7 @@ export function AlunoForm({ student }: { student?: Student }) {
           {/* Retorno */}
           <div className="space-y-4">
             <p className="text-label uppercase tracking-wider" style={{ color: '#1e6b40' }}>Voltar a Entrar em Contato</p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Quando retornar</Label>
                 <Select value={form.follow_up} onValueChange={v => { if (v) setForm(f => ({ ...f, follow_up: v as any })) }}>

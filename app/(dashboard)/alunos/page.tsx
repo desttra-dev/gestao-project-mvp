@@ -50,7 +50,7 @@ export default async function AlunosPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-h1">Alunos</h1>
           <p className="text-body mt-1">
@@ -58,7 +58,7 @@ export default async function AlunosPage({
             {retornos > 0 && <> · <span style={{ color: '#b45309', fontWeight: 600 }}>{retornos} com retorno agendado</span></>}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <ExportCsvButton href={`/api/alunos/export${status || q ? `?${new URLSearchParams({ ...(status ? { status } : {}), ...(q ? { q } : {}) })}` : ''}`} />
           <Link href="/alunos/novo">
             <Button><Plus className="h-4 w-4 mr-2" />Novo Aluno</Button>
@@ -79,8 +79,8 @@ export default async function AlunosPage({
       )}
 
       <Card>
-        <CardContent className="p-0">
-          <Table>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table className="min-w-[540px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>

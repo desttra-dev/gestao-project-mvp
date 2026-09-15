@@ -35,7 +35,7 @@ export default async function AulasPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-h1">Aulas</h1>
           <p className="text-body mt-1">
@@ -44,7 +44,7 @@ export default async function AulasPage({
             <span style={{ color: '#6b8c6b' }}>{total} no total</span>
           </p>
         </div>
-        <Link href="/aulas/nova">
+        <Link href="/aulas/nova" className="flex-shrink-0">
           <Button>
             <Plus className="h-4 w-4 mr-2" />
             Nova Aula

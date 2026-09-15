@@ -78,7 +78,7 @@ export function PlanosManager({ plans }: { plans: Plan[] }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>País</Label>
               <Select value={form.country} onValueChange={handleCountryChange}>
@@ -104,7 +104,7 @@ export function PlanosManager({ plans }: { plans: Plan[] }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Valor ({form.currency === 'BRL' ? 'R$' : '€'}) *</Label>
               <Input

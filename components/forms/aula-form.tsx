@@ -366,7 +366,7 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
             </div>
 
             {/* Matéria + Nível */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Matéria</Label>
                 <Select
@@ -406,7 +406,7 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
             </div>
 
             {/* Início + Término + Valor */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="scheduled_at">Início *</Label>
                 <Input
@@ -492,7 +492,7 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
 
             {/* Repetição — só na criação */}
             {!isEditing && (
-              <div className={form.repeat !== 'none' ? 'grid grid-cols-2 gap-3' : ''}>
+              <div className={form.repeat !== 'none' ? 'grid grid-cols-1 sm:grid-cols-2 gap-3' : ''}>
                 <div className="space-y-2">
                   <Label>Repetição</Label>
                   <Select

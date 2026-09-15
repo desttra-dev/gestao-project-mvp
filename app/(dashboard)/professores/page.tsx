@@ -18,12 +18,12 @@ export default async function ProfessoresPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Professores</h1>
           <p className="text-sm text-slate-500 mt-1">{professors?.length ?? 0} cadastrados</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <ExportCsvButton href="/api/professores/export" />
           <Link href="/professores/novo">
             <Button>
@@ -35,8 +35,8 @@ export default async function ProfessoresPage() {
       </div>
 
       <Card>
-        <CardContent className="p-0">
-          <Table>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table className="min-w-[540px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
