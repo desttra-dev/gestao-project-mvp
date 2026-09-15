@@ -433,11 +433,11 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
               <div className="space-y-2">
                 <Label>Status</Label>
                 <div className="flex flex-wrap gap-2">
-                  {[
+                  {([
                     { value: 'agendada',  label: 'Agendada'  },
                     { value: 'realizada', label: 'Realizada' },
                     { value: 'cancelada', label: 'Cancelada' },
-                  ].map(s => (
+                  ] as const).map(s => (
                     <Chip key={s.value} label={s.label} selected={form.status === s.value}
                       onClick={() => setForm(f => ({ ...f, status: s.value }))} />
                   ))}
