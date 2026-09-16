@@ -41,10 +41,38 @@ export async function GET(request: Request) {
     ZOOM_CLIENT_SECRET:        !!process.env.ZOOM_CLIENT_SECRET,
   }
 
+  const list = url.searchParams.get('list') === '1'
+
   if (!meetingId && !classId) {
+    if (!list) {
+      return Response.json({
+        info: 'Use ?list=1 para ver últimas aulas, ?meeting_id=XXXX ou ?class_id=UUID para testar. Adicione &send=1 para enviar.',
+        env: envStatus,
+      })
+    }
+
+    // Listar últimas 15 aulas com dados Zoom
+    let supabase2: ReturnType<typeof createServiceClient>
+    try { supabase2 = createServiceClient() } catch {
+      return Response.json({ error: 'SUPABASE_SERVICE_ROLE_KEY não configurada' }, { status: 500 })
+    }
+
+    const { data: aulas } = await supabase2
+      .from('classes')
+      .select('id, scheduled_at, zoom_meeting_id, zoom_join_url, student:students(name), professor:professors(name)')
+      .order('scheduled_at', { ascending: false })
+      .limit(15)
+
     return Response.json({
-      info: 'Use ?meeting_id=XXXX ou ?class_id=UUID para testar. Adicione &send=1 para enviar email de verdade.',
       env: envStatus,
+      aulas: (aulas ?? []).map((a: any) => ({
+        class_id: a.id,
+        data: a.scheduled_at ? a.scheduled_at.slice(0, 16).replace('T', ' ') : '—',
+        aluno: a.student?.name ?? '—',
+        professor: a.professor?.name ?? '—',
+        zoom_meeting_id: a.zoom_meeting_id ?? '❌ SEM ZOOM',
+        zoom_join_url: a.zoom_join_url ?? '—',
+      })),
     })
   }
 
