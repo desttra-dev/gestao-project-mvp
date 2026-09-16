@@ -42,8 +42,11 @@ export async function GET(request: Request) {
     ZOOM_CLIENT_SECRET:        !!process.env.ZOOM_CLIENT_SECRET,
   }
 
-  const list     = url.searchParams.get('list') === '1'
-  const zoomTest = url.searchParams.get('zoom_test') === '1'
+  const list       = url.searchParams.get('list') === '1'
+  const zoomTest   = url.searchParams.get('zoom_test') === '1'
+  const createTest = url.searchParams.get('create_test') === '1'
+  const fixClassId = url.searchParams.get('fix_class_id')
+  const fixMtgId   = url.searchParams.get('fix_meeting_id')
 
   // Teste de credenciais Zoom
   if (zoomTest) {
@@ -51,10 +54,90 @@ export async function GET(request: Request) {
     return Response.json({ env: envStatus, zoom_credentials: result })
   }
 
+  // Testar criação real de reunião Zoom (sem salvar)
+  if (createTest) {
+    const accountId    = process.env.ZOOM_ACCOUNT_ID
+    const clientId     = process.env.ZOOM_CLIENT_ID
+    const clientSecret = process.env.ZOOM_CLIENT_SECRET
+    if (!accountId || !clientId || !clientSecret) {
+      return Response.json({ error: 'Credenciais Zoom não configuradas' }, { status: 500 })
+    }
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+    const tokenRes = await fetch(
+      `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${accountId}`,
+      { method: 'POST', headers: { Authorization: `Basic ${credentials}` } }
+    )
+    const tokenData = await tokenRes.json()
+    if (!tokenData.access_token) {
+      return Response.json({ error: 'Falha ao obter token', token_response: tokenData })
+    }
+    const token = tokenData.access_token
+
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const startTime = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth()+1)}-${pad(tomorrow.getDate())}T10:00:00`
+
+    const meetBody = {
+      topic: '[TESTE DIAGNÓSTICO] Desttra',
+      type: 2,
+      start_time: startTime,
+      duration: 60,
+      timezone: 'America/Sao_Paulo',
+      settings: { auto_recording: 'cloud', join_before_host: true, waiting_room: false },
+    }
+    const meetRes = await fetch('https://api.zoom.us/v2/users/me/meetings', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(meetBody),
+    })
+    const meetStatus = meetRes.status
+    const meetData = await meetRes.json()
+
+    if (!meetRes.ok) {
+      return Response.json({
+        ok: false,
+        create_meeting_status: meetStatus,
+        create_meeting_error: meetData,
+        note: 'Criação de reunião falhou. Veja create_meeting_error para o motivo exato.',
+      })
+    }
+
+    // Deletar a reunião de teste imediatamente
+    if (meetData.id) {
+      await fetch(`https://api.zoom.us/v2/meetings/${meetData.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    }
+
+    return Response.json({
+      ok: true,
+      create_meeting_status: meetStatus,
+      created_meeting_id: meetData.id,
+      join_url: meetData.join_url,
+      note: 'Reunião criada com sucesso e deletada em seguida (era só teste).',
+    })
+  }
+
+  // Atualizar zoom_meeting_id manualmente em uma aula
+  if (fixClassId && fixMtgId) {
+    let supabaseFix: ReturnType<typeof createServiceClient>
+    try { supabaseFix = createServiceClient() } catch {
+      return Response.json({ error: 'SUPABASE_SERVICE_ROLE_KEY não configurada' }, { status: 500 })
+    }
+    const joinUrl = `https://zoom.us/j/${fixMtgId}`
+    const { error: fixErr } = await supabaseFix.from('classes').update({
+      zoom_meeting_id: fixMtgId,
+      zoom_join_url: joinUrl,
+    }).eq('id', fixClassId)
+    if (fixErr) return Response.json({ error: fixErr.message }, { status: 500 })
+    return Response.json({ ok: true, class_id: fixClassId, zoom_meeting_id: fixMtgId, zoom_join_url: joinUrl })
+  }
+
   if (!meetingId && !classId) {
     if (!list) {
       return Response.json({
-        info: 'Use ?list=1 para ver últimas aulas, ?zoom_test=1 para testar credenciais Zoom, ?meeting_id=XXXX ou ?class_id=UUID para testar. Adicione &send=1 para enviar.',
+        info: 'Use ?list=1 para ver últimas aulas, ?zoom_test=1 para testar credenciais, ?create_test=1 para testar criação de reunião, ?fix_class_id=UUID&fix_meeting_id=XXXXX para corrigir manualmente, ?meeting_id=XXXX ou ?class_id=UUID para testar. Adicione &send=1 para enviar.',
         env: envStatus,
       })
     }
