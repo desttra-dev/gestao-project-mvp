@@ -1,4 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
+export const dynamic = 'force-dynamic'
+
+import { createServiceClient } from '@/lib/supabase/service'
 import { createZoomMeeting } from '@/lib/zoom'
 import { sendEmail } from '@/lib/email'
 import { toBRT } from '@/lib/date-utils'
@@ -109,6 +111,8 @@ export async function POST(request: Request) {
 
   if (!classes?.length) return Response.json({ error: 'dados insuficientes' }, { status: 400 })
 
+  console.log('[post-create] iniciando — classes:', classes.length, 'scheduledAt:', classes[0]?.scheduledAt)
+
   // ── 1. Criar reunião Zoom ─────────────────────────────────────────────────
   let joinUrl: string | null = null
 
@@ -120,13 +124,21 @@ export async function POST(request: Request) {
     repeatUntil,
   })
 
+  console.log('[post-create] createZoomMeeting resultado:', meeting ? `meetingId=${meeting.meetingId}` : 'null')
+
   if (meeting) {
     joinUrl = meeting.joinUrl
-    const supabase = await createClient()
-    await supabase.from('classes').upsert(
-      classes.map(c => ({ id: c.id, zoom_meeting_id: meeting.meetingId, zoom_join_url: meeting.joinUrl })),
-      { onConflict: 'id' }
-    )
+    try {
+      const supabase = createServiceClient()
+      const { error: upsertErr } = await supabase.from('classes').upsert(
+        classes.map(c => ({ id: c.id, zoom_meeting_id: meeting.meetingId, zoom_join_url: meeting.joinUrl })),
+        { onConflict: 'id' }
+      )
+      if (upsertErr) console.error('[post-create] upsert zoom falhou:', upsertErr.message)
+      else console.log('[post-create] zoom_meeting_id salvo com sucesso:', meeting.meetingId)
+    } catch (e) {
+      console.error('[post-create] erro ao criar service client:', e)
+    }
   }
 
   // ── 2. Montar blocos comuns do email ──────────────────────────────────────
