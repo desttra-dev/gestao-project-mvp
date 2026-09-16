@@ -68,7 +68,7 @@ export async function GET(request: Request) {
     const { data: aulas } = await supabase2
       .from('classes')
       .select('id, scheduled_at, zoom_meeting_id, zoom_join_url, student:students(name), professor:professors(name)')
-      .order('scheduled_at', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(15)
 
     return Response.json({
