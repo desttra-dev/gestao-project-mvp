@@ -174,10 +174,9 @@ export async function setupAulaZoom({
 
   // Persiste zoom_join_url em todas as aulas da série
   const supabase = await createClient()
-  await supabase.from('classes').upsert(
-    classes.map(c => ({ id: c.id, zoom_meeting_id: meeting.meetingId, zoom_join_url: meeting.joinUrl })),
-    { onConflict: 'id' }
-  )
+  await supabase.from('classes')
+    .update({ zoom_meeting_id: meeting.meetingId, zoom_join_url: meeting.joinUrl })
+    .in('id', classes.map(c => c.id))
 
   const isSeries    = classes.length > 1
   const levelLabel  = levelLabels[level]  ?? level

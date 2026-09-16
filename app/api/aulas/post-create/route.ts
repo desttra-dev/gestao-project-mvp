@@ -130,11 +130,10 @@ export async function POST(request: Request) {
     joinUrl = meeting.joinUrl
     try {
       const supabase = createServiceClient()
-      const { error: upsertErr } = await supabase.from('classes').upsert(
-        classes.map(c => ({ id: c.id, zoom_meeting_id: meeting.meetingId, zoom_join_url: meeting.joinUrl })),
-        { onConflict: 'id' }
-      )
-      if (upsertErr) console.error('[post-create] upsert zoom falhou:', upsertErr.message)
+      const { error: updateErr } = await supabase.from('classes')
+        .update({ zoom_meeting_id: meeting.meetingId, zoom_join_url: meeting.joinUrl })
+        .in('id', classes.map(c => c.id))
+      if (updateErr) console.error('[post-create] update zoom falhou:', updateErr.message)
       else console.log('[post-create] zoom_meeting_id salvo com sucesso:', meeting.meetingId)
     } catch (e) {
       console.error('[post-create] erro ao criar service client:', e)
