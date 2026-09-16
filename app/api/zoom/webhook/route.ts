@@ -41,6 +41,7 @@ export async function POST(request: Request) {
         id?: number | string
         uuid?: string
         share_url?: string
+        recording_play_passcode?: string
         host_email?: string
         topic?: string
       }
@@ -79,10 +80,11 @@ export async function POST(request: Request) {
     return Response.json({ ok: true, skipped: true })
   }
 
-  const meetingId = String(data.payload?.object?.id ?? '')
-  const shareUrl  = data.payload?.object?.share_url ?? ''
+  const meetingId  = String(data.payload?.object?.id ?? '')
+  const shareUrl   = data.payload?.object?.share_url ?? ''
+  const passcode   = data.payload?.object?.recording_play_passcode ?? ''
 
-  console.log('[zoom-webhook] recording.completed — meetingId:', meetingId, 'shareUrl:', shareUrl ? 'presente' : 'ausente')
+  console.log('[zoom-webhook] recording.completed — meetingId:', meetingId, 'shareUrl:', shareUrl ? 'presente' : 'ausente', 'passcode:', passcode ? 'presente' : 'ausente')
 
   if (!meetingId || !shareUrl) {
     console.warn('[zoom-webhook] meetingId ou shareUrl ausentes no payload')
@@ -181,6 +183,11 @@ export async function POST(request: Request) {
                       padding:14px 40px;border-radius:10px;font-size:15px;font-weight:700;letter-spacing:0.3px;">
               ▶ Assistir Gravação
             </a>
+            ${passcode ? `
+            <div style="margin:16px auto 4px;display:inline-block;background:#f8fdf9;border:1px solid #bbf7d0;border-radius:8px;padding:10px 20px;">
+              <p style="margin:0 0 2px;color:#6b8c6b;font-size:11px;">Senha de acesso</p>
+              <p style="margin:0;color:#0d2e1e;font-size:20px;font-weight:800;letter-spacing:4px;">${passcode}</p>
+            </div>` : ''}
             <p style="margin:14px 0 4px;color:#6b8c6b;font-size:12px;">ou acesse pelo link:</p>
             <p style="margin:0;font-size:11px;word-break:break-all;">
               <a href="${shareUrl}" style="color:#1e6b40;text-decoration:underline;">${shareUrl}</a>
