@@ -6,14 +6,13 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
-import type { Student, Professor, Enrollment, Class } from '@/lib/types'
+import type { Student, Professor, Class } from '@/lib/types'
 import { createAulaGoogleEvent } from '@/app/actions/aulas'
 import { addDays, addWeeks, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { CalendarDays, Calendar, Search, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { CalendarDays, Calendar, Search, X } from 'lucide-react'
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -37,11 +36,22 @@ const LEVELS = [
 ]
 
 const DURATIONS = [
-  { label: '45min', minutes: 45  },
-  { label: '1h',    minutes: 60  },
-  { label: '1h30',  minutes: 90  },
-  { label: '2h',    minutes: 120 },
+  { label: '1h', minutes: 60  },
+  { label: '2h', minutes: 120 },
+  { label: '3h', minutes: 180 },
+  { label: '4h', minutes: 240 },
 ]
+
+const TIME_OPTIONS = (() => {
+  const opts: string[] = []
+  for (let h = 6; h <= 23; h++) {
+    for (const m of [0, 30]) {
+      if (h === 23 && m === 30) continue
+      opts.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
+    }
+  }
+  return opts
+})()
 
 type RepeatMode = 'none' | 'daily' | 'weekly'
 type EditScope  = 'single' | 'following'
@@ -162,39 +172,103 @@ function StudentSearch({ students, value, onChange }: {
   )
 }
 
+// ─── Professor Search ──────────────────────────────────────────────────────────
+
+function ProfessorSearch({ professors, value, onChange }: {
+  professors: Professor[]
+  value: string
+  onChange: (id: string) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen]   = useState(false)
+  const inputRef          = useRef<HTMLInputElement>(null)
+  const selected          = professors.find(p => p.id === value)
+
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase()
+    return professors.filter(p => p.name.toLowerCase().includes(q)).slice(0, 8)
+  }, [professors, query])
+
+  const handleSelect = (id: string) => {
+    onChange(id)
+    setQuery('')
+    setOpen(false)
+  }
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none" style={{ color: '#9dbfa9' }} />
+        <input
+          ref={inputRef}
+          value={selected ? selected.name : query}
+          onChange={e => { setQuery(e.target.value); onChange(''); setOpen(true) }}
+          onFocus={() => !selected && setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder="Buscar professor..."
+          className="w-full pl-9 py-2.5 rounded-lg border text-sm outline-none transition-colors"
+          style={{
+            borderColor:     value ? '#1e6b40' : '#d4e8d4',
+            paddingRight:    value ? '36px' : '12px',
+            backgroundColor: value ? '#f5fdf8' : 'white',
+            color: '#0d2e1e',
+          }}
+        />
+        {value && (
+          <button type="button" onClick={() => { onChange(''); setQuery(''); inputRef.current?.focus() }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-100">
+            <X className="h-3.5 w-3.5" style={{ color: '#6b8c6b' }} />
+          </button>
+        )}
+      </div>
+      {open && !selected && (
+        <div className="absolute z-50 w-full mt-1 rounded-xl border shadow-lg overflow-hidden"
+          style={{ borderColor: '#d4e8d4', backgroundColor: 'white', maxHeight: 220, overflowY: 'auto' }}>
+          {filtered.length === 0 ? (
+            <p className="px-4 py-3 text-sm" style={{ color: '#9dbfa9' }}>Nenhum professor encontrado</p>
+          ) : filtered.map(p => (
+            <button key={p.id} type="button" onMouseDown={() => handleSelect(p.id)}
+              className="w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-verde-gelo"
+              style={{ color: '#0d2e1e' }}>
+              <span className="font-medium">{p.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main Form ─────────────────────────────────────────────────────────────────
 
 interface AulaFormProps {
   students:    Student[]
   professors:  Professor[]
-  enrollments: Enrollment[]
+  enrollments: unknown[]
   aula?:       Class
 }
 
-export function AulaForm({ students, professors, enrollments, aula }: AulaFormProps) {
+export function AulaForm({ students, professors, aula }: AulaFormProps) {
   const router    = useRouter()
   const supabase  = createClient()
   const [loading, setLoading]               = useState(false)
   const [showSeriesDialog, setShowSeriesDialog] = useState(false)
-  const [showExtras, setShowExtras]         = useState(false)
   const isEditing = !!aula
   const hasSeries = isEditing && !!aula?.series_id
 
   const defaultDt = format(new Date(), "yyyy-MM-dd'T'HH:mm")
 
   const [form, setForm] = useState({
-    student_id:    aula?.student_id    ?? '',
-    teacher_id:    aula?.teacher_id    ?? '',
-    enrollment_id: aula?.enrollment_id ?? '',
-    scheduled_at:  aula?.scheduled_at  ? toDatetimeLocal(aula.scheduled_at) : defaultDt,
-    ends_at_time:  aula?.ends_at       ? format(new Date(aula.ends_at), 'HH:mm') : '',
-    level:         aula?.level   ?? 'fundamental',
-    subject:       aula?.subject ?? '',
-    price:         aula?.price   != null ? String(aula.price) : '',
-    status:        aula?.status  ?? 'agendada',
-    notes:         aula?.notes   ?? '',
-    repeat:        'none' as RepeatMode,
-    repeat_until:  '',
+    student_id:   aula?.student_id   ?? '',
+    teacher_id:   aula?.teacher_id   ?? '',
+    scheduled_at: aula?.scheduled_at ? toDatetimeLocal(aula.scheduled_at) : defaultDt,
+    ends_at_time: aula?.ends_at      ? format(new Date(aula.ends_at), 'HH:mm') : '',
+    level:        aula?.level   ?? 'fundamental',
+    subject:      aula?.subject ?? '',
+    status:       aula?.status  ?? 'agendada',
+    notes:        aula?.notes   ?? '',
+    repeat:       'none' as RepeatMode,
+    repeat_until: '',
   })
 
   const dateValue = form.scheduled_at.slice(0, 10)
@@ -222,10 +296,7 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
     return Math.round((end.getTime() - start.getTime()) / 60000)
   }, [form.scheduled_at, form.ends_at_time, timeValue])
 
-  const filteredEnrollments = useMemo(
-    () => enrollments.filter(e => !form.student_id || e.student_id === form.student_id),
-    [enrollments, form.student_id]
-  )
+  const isPersonalizado = selectedDuration !== null && !DURATIONS.some(d => d.minutes === selectedDuration)
 
   const previewDates = useMemo(() => {
     if (isEditing || !form.scheduled_at || form.repeat === 'none') return []
@@ -244,10 +315,10 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
     const base = {
       student_id:    form.student_id,
       teacher_id:    form.teacher_id,
-      enrollment_id: form.enrollment_id || null,
+      enrollment_id: null,
       level:         form.level,
       subject:       form.subject || null,
-      price:         form.price ? parseFloat(form.price) : null,
+      price:         null,
       status:        form.status,
       notes:         form.notes || null,
     }
@@ -308,12 +379,12 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
     const payloads = dates.map(d => ({
       student_id:    form.student_id,
       teacher_id:    form.teacher_id,
-      enrollment_id: form.enrollment_id || null,
+      enrollment_id: null,
       scheduled_at:  d.toISOString(),
       ends_at:       computeEndsAt(d.toISOString(), form.ends_at_time),
       level:         form.level,
       subject:       form.subject || null,
-      price:         form.price ? parseFloat(form.price) : null,
+      price:         null,
       status:        'agendada',
       notes:         form.notes || null,
       series_id:     seriesId,
@@ -325,8 +396,8 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
 
     const prof    = professors.find(p => p.id === form.teacher_id)
     const student = students.find(s => s.id === form.student_id)
-    const studentName  = student?.name ?? 'Aluno'
-    const professorName = prof?.name   ?? 'Prof'
+    const studentName   = student?.name ?? 'Aluno'
+    const professorName = prof?.name    ?? 'Prof'
 
     toast.success(dates.length > 1 ? `${dates.length} aulas registradas!` : 'Aula registrada!')
 
@@ -374,7 +445,6 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
     router.refresh()
   }
 
-  const selectedEnrollment = filteredEnrollments.find(e => e.id === form.enrollment_id)
   const isValid = !!(form.student_id && form.teacher_id && dateValue && timeValue &&
     (form.repeat === 'none' || !!form.repeat_until || isEditing))
 
@@ -449,18 +519,14 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
             <div className="space-y-2">
               <Label>Aluno *</Label>
               <StudentSearch students={students} value={form.student_id}
-                onChange={id => setForm(f => ({ ...f, student_id: id, enrollment_id: '' }))} />
+                onChange={id => setForm(f => ({ ...f, student_id: id }))} />
             </div>
 
             {/* Professor */}
             <div className="space-y-2">
               <Label>Professor *</Label>
-              <div className="flex flex-wrap gap-2">
-                {professors.map(p => (
-                  <Chip key={p.id} label={p.name} selected={form.teacher_id === p.id}
-                    onClick={() => setForm(f => ({ ...f, teacher_id: p.id }))} />
-                ))}
-              </div>
+              <ProfessorSearch professors={professors} value={form.teacher_id}
+                onChange={id => setForm(f => ({ ...f, teacher_id: id }))} />
             </div>
 
             {/* Data e horário */}
@@ -469,8 +535,18 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
               <div className="grid grid-cols-2 gap-3">
                 <Input type="date" value={dateValue}
                   onChange={e => setDate(e.target.value)} required />
-                <Input type="time" value={timeValue}
-                  onChange={e => setTime(e.target.value)} required />
+                <select
+                  value={timeValue}
+                  onChange={e => setTime(e.target.value)}
+                  required
+                  className="rounded-lg border px-3 py-2.5 text-sm outline-none transition-colors"
+                  style={{ borderColor: timeValue ? '#1e6b40' : '#d4e8d4', color: timeValue ? '#0d2e1e' : '#9dbfa9', backgroundColor: timeValue ? '#f5fdf8' : 'white' }}
+                >
+                  <option value="">Horário</option>
+                  {TIME_OPTIONS.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -483,13 +559,15 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
                     <Chip key={d.minutes} label={d.label} selected={selectedDuration === d.minutes}
                       onClick={() => applyDuration(d.minutes)} />
                   ))}
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm" style={{ color: '#6b8c6b' }}>até</span>
-                    <input type="time" value={form.ends_at_time}
-                      onChange={e => setForm(f => ({ ...f, ends_at_time: e.target.value }))}
-                      className="px-2 py-1.5 rounded-lg border text-sm w-28 outline-none"
-                      style={{ borderColor: '#d4e8d4', color: '#0d2e1e' }} />
-                  </div>
+                  <Chip label="Personalizado" selected={isPersonalizado}
+                    onClick={() => setForm(f => ({ ...f, ends_at_time: '' }))} />
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-sm" style={{ color: '#6b8c6b' }}>Término:</span>
+                  <input type="time" value={form.ends_at_time}
+                    onChange={e => setForm(f => ({ ...f, ends_at_time: e.target.value }))}
+                    className="px-2 py-1.5 rounded-lg border text-sm w-28 outline-none"
+                    style={{ borderColor: '#d4e8d4', color: '#0d2e1e' }} />
                 </div>
               </div>
             )}
@@ -559,58 +637,14 @@ export function AulaForm({ students, professors, enrollments, aula }: AulaFormPr
               </div>
             )}
 
-            {/* Mais opções */}
-            <button type="button" onClick={() => setShowExtras(v => !v)}
-              className="flex items-center gap-1.5 text-sm font-medium"
-              style={{ color: '#6b8c6b' }}>
-              {showExtras ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              {showExtras ? 'Menos opções' : 'Mais opções'} (matrícula, valor, obs.)
-            </button>
-
-            {showExtras && (
-              <div className="space-y-4 border-t pt-4" style={{ borderColor: '#e8f0e8' }}>
-                {/* Matrícula */}
-                <div className="space-y-2">
-                  <Label>Matrícula / Plano</Label>
-                  <Select
-                    value={form.enrollment_id || 'avulsa'}
-                    onValueChange={v => setForm(f => ({ ...f, enrollment_id: v === 'avulsa' ? '' : (v ?? '') }))}
-                    disabled={!form.student_id}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue>
-                        {form.enrollment_id ? ((selectedEnrollment?.plan as any)?.name ?? 'Plano') : 'Aula avulsa'}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="avulsa" label="Aula avulsa">Aula avulsa</SelectItem>
-                      {filteredEnrollments.map(e => (
-                        <SelectItem key={e.id} value={e.id} label={(e.plan as any)?.name ?? 'Plano'}>
-                          {(e.plan as any)?.name ?? 'Plano'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Valor */}
-                <div className="space-y-2">
-                  <Label htmlFor="price">Valor (R$)</Label>
-                  <Input id="price" type="number" step="0.01" min="0" placeholder="0,00"
-                    value={form.price}
-                    onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
-                </div>
-
-                {/* Observações */}
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Observações</Label>
-                  <textarea id="notes" value={form.notes} rows={3}
-                    onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                    className="w-full rounded-lg border px-3 py-2 text-sm resize-none outline-none"
-                    style={{ borderColor: '#d4e8d4', color: '#0d2e1e' }} />
-                </div>
-              </div>
-            )}
+            {/* Observações */}
+            <div className="space-y-2">
+              <Label htmlFor="notes">Observações <span style={{ color: '#9dbfa9', fontWeight: 400 }}>(opcional)</span></Label>
+              <textarea id="notes" value={form.notes} rows={3}
+                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                className="w-full rounded-lg border px-3 py-2 text-sm resize-none outline-none"
+                style={{ borderColor: '#d4e8d4', color: '#0d2e1e' }} />
+            </div>
 
             {/* Submit */}
             <div className="flex gap-3 pt-1">

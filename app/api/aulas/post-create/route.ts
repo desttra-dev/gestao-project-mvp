@@ -26,51 +26,55 @@ function buildEmail({
   isSeries: boolean
 }) {
   const zoomBlock = zoomUrl ? `
-    <div style="text-align:center;padding:16px 0 8px;">
+    <div style="text-align:center;padding:24px 0 16px;">
       <a href="${zoomUrl}" target="_blank"
          style="display:inline-block;background:#2D8CFF;color:white;text-decoration:none;
-                padding:12px 32px;border-radius:8px;font-size:15px;font-weight:700;">
+                padding:14px 40px;border-radius:10px;font-size:15px;font-weight:700;letter-spacing:0.3px;">
         Entrar no Zoom
       </a>
-      <p style="margin:8px 0 0;color:#9dbfa9;font-size:11px;">
+      <p style="margin:14px 0 4px;color:#6b8c6b;font-size:12px;">ou acesse pelo link:</p>
+      <p style="margin:0;font-size:11px;word-break:break-all;">
+        <a href="${zoomUrl}" style="color:#2D8CFF;text-decoration:underline;">${zoomUrl}</a>
+      </p>
+      <p style="margin:10px 0 0;color:#9dbfa9;font-size:11px;">
         Link permanente — válido para ${isSeries ? 'todas as aulas desta série' : 'esta aula'}
       </p>
     </div>` : ''
 
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/></head>
-<body style="margin:0;padding:0;background:#f5f7f5;font-family:sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7f5;padding:32px 16px;">
+<body style="margin:0;padding:0;background:#f0f4f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4f0;padding:40px 16px;">
   <tr><td align="center">
     <table width="560" cellpadding="0" cellspacing="0"
-           style="background:white;border-radius:12px;overflow:hidden;border:1px solid #d4e8d4;">
+           style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
       <tr>
-        <td style="background:#1e6b40;padding:24px 32px;">
-          <p style="margin:0;color:white;font-size:20px;font-weight:700;">Desttra Educação</p>
-          <p style="margin:4px 0 0;color:#a7d4b8;font-size:13px;">Agendamento de aulas</p>
+        <td style="background:linear-gradient(135deg,#1e6b40,#2da862);padding:28px 40px;text-align:center;">
+          <p style="margin:0;color:white;font-size:22px;font-weight:800;letter-spacing:-0.5px;">Desttra Educação</p>
+          <p style="margin:6px 0 0;color:#a7d4b8;font-size:13px;">Confirmação de agendamento</p>
         </td>
       </tr>
       <tr>
-        <td style="padding:28px 32px;">
+        <td style="padding:36px 40px;">
           <p style="margin:0 0 6px;color:#6b8c6b;font-size:13px;">${greeting}</p>
-          <p style="margin:0 0 24px;color:#0d2e1e;font-size:15px;line-height:1.5;">${intro}</p>
+          <p style="margin:0 0 28px;color:#0d2e1e;font-size:15px;line-height:1.6;">${intro}</p>
           <table width="100%" cellpadding="0" cellspacing="0"
-                 style="background:#f5f7f5;border-radius:8px;padding:16px;margin-bottom:24px;">
+                 style="background:#f8fdf9;border-radius:10px;padding:18px 20px;margin-bottom:28px;border:1px solid #e0f0e6;">
             ${detailsRows}
           </table>
-          <p style="margin:0 0 10px;color:#0d2e1e;font-size:14px;font-weight:600;">
+          <p style="margin:0 0 12px;color:#0d2e1e;font-size:14px;font-weight:700;">
             ${isSeries ? 'Datas agendadas' : 'Data e horário'}
           </p>
           <table width="100%" cellpadding="0" cellspacing="0"
-                 style="border:1px solid #d4e8d4;border-radius:8px;overflow:hidden;margin-bottom:16px;">
+                 style="border:1px solid #d4e8d4;border-radius:10px;overflow:hidden;margin-bottom:8px;">
             ${dateRows}
           </table>
           ${zoomBlock}
         </td>
       </tr>
       <tr>
-        <td style="padding:16px 32px;border-top:1px solid #e8f0e8;background:#fafcfa;">
+        <td style="padding:18px 40px;border-top:1px solid #e8f0e8;background:#fafcfa;text-align:center;">
           <p style="margin:0;color:#9dbfa9;font-size:11px;">
-            Email automático da plataforma Desttra. Dúvidas: gestao@desttra.com
+            Email automático da plataforma Desttra &nbsp;·&nbsp; Dúvidas: gestao@desttra.com
           </p>
         </td>
       </tr>

@@ -52,13 +52,6 @@ interface ClassItem {
 
 type CalView = 'mes' | 'semana' | 'dia'
 
-interface DragState {
-  event: ClassItem
-  offsetY: number           // pixels into the event where the grab happened
-  previewDay: Date
-  previewMinutes: number    // minutes from START_H*60 (0 = 07:00)
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getEndsAt(c: ClassItem): Date {
@@ -76,10 +69,6 @@ function eventPosition(start: Date, end: Date) {
 
 function currentTimeTop(now: Date) {
   return (getHours(now) + getMinutes(now) / 60 - START_H) * HOUR_H
-}
-
-function snapMinutes(raw: number): number {
-  return Math.round(raw / 15) * 15
 }
 
 // ─── Event Popup ──────────────────────────────────────────────────────────────
@@ -211,24 +200,19 @@ function EventPopup({
   )
 }
 
-// ─── Time Grid (Week & Day) with drag-and-drop ────────────────────────────────
+// ─── Time Grid (Week & Day) ───────────────────────────────────────────────────
 
 function TimeGrid({
   days,
   classes,
   onEventClick,
-  onRefresh,
 }: {
   days: Date[]
   classes: ClassItem[]
   onEventClick: (c: ClassItem) => void
-  onRefresh: () => void
 }) {
-  const [now, setNow]       = useState(new Date())
-  const [drag, setDrag]     = useState<DragState | null>(null)
-  const [saving, setSaving] = useState(false)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const gridRef   = useRef<HTMLDivElement>(null)
+  const [now, setNow] = useState(new Date())
+  const scrollRef     = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60_000)
@@ -245,102 +229,10 @@ function TimeGrid({
 
   const forDay = (d: Date) => classes.filter(c => isSameDay(new Date(c.scheduled_at), d))
 
-  // ── drag helpers ────────────────────────────────────────────────────────────
-
-  const startDrag = (e: React.PointerEvent<HTMLDivElement>, c: ClassItem) => {
-    if (c.status === 'cancelada') return
-    e.stopPropagation()
-    e.currentTarget.setPointerCapture(e.pointerId)
-    const rect = e.currentTarget.getBoundingClientRect()
-    const start = new Date(c.scheduled_at)
-    setDrag({
-      event: c,
-      offsetY: e.clientY - rect.top,
-      previewDay: start,
-      previewMinutes: (getHours(start) - START_H) * 60 + getMinutes(start),
-    })
-  }
-
-  const onDragMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!drag || !gridRef.current) return
-    const gridRect = gridRef.current.getBoundingClientRect()
-
-    // Which day column?
-    const colZone   = gridRect.width - LABEL_W
-    const colWidth  = colZone / days.length
-    const colIndex  = Math.max(0, Math.min(days.length - 1,
-      Math.floor((e.clientX - gridRect.left - LABEL_W) / colWidth),
-    ))
-
-    // Which time row? (account for scroll)
-    const scrollTop = scrollRef.current?.scrollTop ?? 0
-    const relY = (e.clientY - gridRect.top) + scrollTop - drag.offsetY
-    const rawMins = relY / HOUR_H * 60
-    const snapped = snapMinutes(rawMins)
-    const clamped = Math.max(0, Math.min(snapped, (TOTAL_H - 1) * 60))
-
-    setDrag(d => d ? { ...d, previewDay: days[colIndex], previewMinutes: clamped } : d)
-  }
-
-  const onDragEnd = async (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!drag) return
-    const { event, previewDay, previewMinutes } = drag
-    setDrag(null)
-
-    const origStart = new Date(event.scheduled_at)
-    const origEnd   = getEndsAt(event)
-    const durationMs = origEnd.getTime() - origStart.getTime()
-
-    const newHour = Math.floor(previewMinutes / 60) + START_H
-    const newMin  = previewMinutes % 60
-
-    // Build new date keeping previewDay's date + new local time
-    // setHours uses local browser time (BRT in Brazil), which is what we want
-    const newStart = new Date(previewDay)
-    newStart.setHours(newHour, newMin, 0, 0)
-    const newEnd = new Date(newStart.getTime() + durationMs)
-
-    // Skip if time didn't change
-    if (newStart.toISOString() === origStart.toISOString()) return
-
-    setSaving(true)
-    const res = await fetch('/api/aulas/reschedule', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        aulaId: event.id,
-        scheduledAt: newStart.toISOString(),
-        endsAt: newEnd.toISOString(),
-      }),
-    })
-    setSaving(false)
-    if (!res.ok) { toast.error('Erro ao reagendar aula'); return }
-    toast.success(`Aula movida para ${format(newStart, "EEE dd/MM 'às' HH:mm", { locale: ptBR })}`)
-    onRefresh()
-  }
-
-  // ── preview ghost position ──────────────────────────────────────────────────
-
-  const dragPreview = drag ? (() => {
-    const origStart = new Date(drag.event.scheduled_at)
-    const origEnd   = getEndsAt(drag.event)
-    const durH = (origEnd.getTime() - origStart.getTime()) / 3_600_000
-    const top    = drag.previewMinutes / 60 * HOUR_H
-    const height = Math.max(durH * HOUR_H, 22)
-    const colIndex = days.findIndex(d => isSameDay(d, drag.previewDay))
-    return { top, height, colIndex }
-  })() : null
-
   const minW = LABEL_W + days.length * 80
 
   return (
     <div className="flex flex-col relative" style={{ border: '1px solid #d4e8d4', borderRadius: 12, overflow: 'hidden', minWidth: minW }}>
-      {saving && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-white/60">
-          <span className="text-sm" style={{ color: '#1e6b40' }}>Salvando…</span>
-        </div>
-      )}
-
       {/* Day header */}
       <div className="flex" style={{ borderBottom: '1px solid #d4e8d4', backgroundColor: '#f5f7f5' }}>
         <div className="flex-shrink-0" style={{ width: LABEL_W }} />
@@ -362,7 +254,7 @@ function TimeGrid({
 
       {/* Scrollable grid */}
       <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: 560 }}>
-        <div ref={gridRef} className="flex relative" style={{ height: TOTAL_H * HOUR_H }}>
+        <div className="flex relative" style={{ height: TOTAL_H * HOUR_H }}>
           {/* Hour labels */}
           <div className="flex-shrink-0 relative" style={{ width: LABEL_W }}>
             {HOURS.map(h => (
@@ -393,50 +285,24 @@ function TimeGrid({
                   </div>
                 )}
 
-                {/* Preview ghost */}
-                {drag && dragPreview && dragPreview.colIndex === di && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: dragPreview.top + 1,
-                      left: 3, right: 3,
-                      height: dragPreview.height - 2,
-                      backgroundColor: '#1e6b40',
-                      opacity: 0.25,
-                      borderRadius: 4,
-                      border: '2px dashed #1e6b40',
-                      zIndex: 20,
-                      pointerEvents: 'none',
-                    }}
-                  />
-                )}
-
                 {dayClasses.map(c => {
                   const start = new Date(c.scheduled_at)
                   const end   = getEndsAt(c)
                   const { top, height } = eventPosition(start, end)
                   const st = statusStyle[c.status] ?? statusStyle.agendada
-                  const isDragging = drag?.event.id === c.id
                   return (
                     <div
                       key={c.id}
-                      onPointerDown={e => startDrag(e, c)}
-                      onPointerMove={onDragMove}
-                      onPointerUp={onDragEnd}
-                      onClick={() => !drag && onEventClick(c)}
+                      onClick={() => onEventClick(c)}
                       style={{
                         position: 'absolute', top: top + 1, left: 3, right: 3, height: height - 2,
-                        backgroundColor: isDragging ? 'transparent' : st.bg,
+                        backgroundColor: st.bg,
                         color: st.text,
-                        borderLeft: isDragging ? 'none' : `3px solid ${st.border}`,
-                        border: isDragging ? '2px dashed #1e6b40' : undefined,
+                        borderLeft: `3px solid ${st.border}`,
                         borderRadius: 4, padding: '2px 5px',
                         overflow: 'hidden',
-                        cursor: c.status === 'cancelada' ? 'pointer' : 'grab',
-                        zIndex: isDragging ? 25 : 5,
-                        opacity: isDragging ? 0.5 : 1,
-                        userSelect: 'none',
-                        touchAction: 'none',
+                        cursor: 'pointer',
+                        zIndex: 5,
                       }}
                     >
                       <p className="text-xs font-semibold leading-tight truncate">
@@ -670,12 +536,12 @@ export function AulasCalendar({ classes }: { classes: ClassItem[] }) {
       {view === 'mes'    && <MonthView current={current} classes={classes} onEventClick={setSelectedEvent} />}
       {view === 'semana' && (
         <div className="overflow-x-auto -mx-1 px-1">
-          <TimeGrid days={weekDays}  classes={classes} onEventClick={setSelectedEvent} onRefresh={() => router.refresh()} />
+          <TimeGrid days={weekDays}  classes={classes} onEventClick={setSelectedEvent} />
         </div>
       )}
       {view === 'dia'    && (
         <div className="overflow-x-auto -mx-1 px-1">
-          <TimeGrid days={[current]} classes={classes} onEventClick={setSelectedEvent} onRefresh={() => router.refresh()} />
+          <TimeGrid days={[current]} classes={classes} onEventClick={setSelectedEvent} />
         </div>
       )}
     </div>
