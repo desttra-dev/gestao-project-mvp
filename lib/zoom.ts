@@ -122,28 +122,47 @@ export async function getZoomRecording(meetingId: string): Promise<{ shareUrl: s
 }
 
 // Exportado para usar em diagnóstico
-export async function testZoomCredentials(): Promise<{ ok: boolean; error?: string; accountInfo?: unknown }> {
+export async function testZoomCredentials(): Promise<{
+  ok: boolean
+  token_ok: boolean
+  meetings_scope_ok: boolean
+  recording_scope_ok: boolean
+  errors: string[]
+}> {
+  const errors: string[] = []
+
+  // 1. Testar obtenção do token
   const tokenResult = await getZoomToken()
-  if ('error' in tokenResult) return { ok: false, error: tokenResult.error }
+  if ('error' in tokenResult) {
+    return { ok: false, token_ok: false, meetings_scope_ok: false, recording_scope_ok: false, errors: [tokenResult.error] }
+  }
+  const token = tokenResult.token
 
-  // Testa se consegue chamar a API
-  const res = await fetch('https://api.zoom.us/v2/users/me', {
-    headers: { Authorization: `Bearer ${tokenResult.token}` },
+  // 2. Testar scope de reuniões — GET /v2/users/me/meetings (leitura, não cria nada)
+  const meetRes = await fetch('https://api.zoom.us/v2/users/me/meetings?page_size=1', {
+    headers: { Authorization: `Bearer ${token}` },
   })
-
-  if (!res.ok) {
-    const body = await res.text()
-    return { ok: false, error: `users/me HTTP ${res.status}: ${body}` }
+  const meetingsOk = meetRes.ok
+  if (!meetRes.ok) {
+    const body = await meetRes.text()
+    errors.push(`meetings scope: HTTP ${meetRes.status} — ${body}`)
   }
 
-  const info = await res.json()
+  // 3. Testar scope de gravações — GET /v2/users/me/recordings?from=2020-01-01&to=2020-01-02
+  const recRes = await fetch('https://api.zoom.us/v2/users/me/recordings?from=2020-01-01&to=2020-01-02', {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  const recordingOk = recRes.ok
+  if (!recRes.ok) {
+    const body = await recRes.text()
+    errors.push(`recordings scope: HTTP ${recRes.status} — ${body}`)
+  }
+
   return {
-    ok: true,
-    accountInfo: {
-      email: info.email,
-      account_id: info.account_id,
-      type: info.type, // 1=Basic, 2=Pro, 3=Business
-      plan_name: info.type === 1 ? 'Basic (gratuito)' : info.type === 2 ? 'Pro' : 'Business+',
-    },
+    ok: meetingsOk && recordingOk,
+    token_ok: true,
+    meetings_scope_ok: meetingsOk,
+    recording_scope_ok: recordingOk,
+    errors,
   }
 }
