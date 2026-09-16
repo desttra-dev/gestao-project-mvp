@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { sendEmail } from '@/lib/email'
 import { toBRT } from '@/lib/date-utils'
 import { format } from 'date-fns'
@@ -18,26 +18,43 @@ const levelLabels: Record<string, string> = {
 
 function verifyZoomSignature(body: string, timestamp: string, signature: string): boolean {
   const secret = process.env.ZOOM_WEBHOOK_SECRET_TOKEN
-  if (!secret) return false
+  if (!secret) {
+    console.warn('[zoom-webhook] ZOOM_WEBHOOK_SECRET_TOKEN não definido')
+    return false
+  }
   const message = `v0:${timestamp}:${body}`
   const hash = createHmac('sha256', secret).update(message).digest('hex')
-  return `v0=${hash}` === signature
+  const expected = `v0=${hash}`
+  const ok = expected === signature
+  if (!ok) console.warn('[zoom-webhook] Assinatura inválida. expected:', expected, 'got:', signature)
+  return ok
 }
 
 export async function POST(request: Request) {
   const rawBody = await request.text()
 
-  const data = JSON.parse(rawBody) as {
+  let data: {
     event: string
     payload?: {
       plainToken?: string
       object?: {
         id?: number | string
+        uuid?: string
         share_url?: string
         host_email?: string
+        topic?: string
       }
     }
   }
+
+  try {
+    data = JSON.parse(rawBody)
+  } catch {
+    console.error('[zoom-webhook] Body não é JSON válido:', rawBody.slice(0, 200))
+    return Response.json({ error: 'body inválido' }, { status: 400 })
+  }
+
+  console.log('[zoom-webhook] evento recebido:', data.event)
 
   // URL validation handshake — responde ANTES de verificar assinatura
   if (data.event === 'endpoint.url_validation' && data.payload?.plainToken) {
@@ -46,6 +63,7 @@ export async function POST(request: Request) {
     const encryptedToken = createHmac('sha256', secret)
       .update(data.payload.plainToken)
       .digest('hex')
+    console.log('[zoom-webhook] URL validation respondida')
     return Response.json({ plainToken: data.payload.plainToken, encryptedToken })
   }
 
@@ -57,16 +75,31 @@ export async function POST(request: Request) {
   }
 
   if (data.event !== 'recording.completed') {
+    console.log('[zoom-webhook] evento ignorado:', data.event)
     return Response.json({ ok: true, skipped: true })
   }
 
-  const meetingId   = String(data.payload?.object?.id ?? '')
-  const shareUrl    = data.payload?.object?.share_url ?? ''
-  if (!meetingId || !shareUrl) return Response.json({ ok: true, skipped: true })
+  const meetingId = String(data.payload?.object?.id ?? '')
+  const shareUrl  = data.payload?.object?.share_url ?? ''
 
-  const supabase = await createClient()
+  console.log('[zoom-webhook] recording.completed — meetingId:', meetingId, 'shareUrl:', shareUrl ? 'presente' : 'ausente')
 
-  const { data: aula } = await supabase
+  if (!meetingId || !shareUrl) {
+    console.warn('[zoom-webhook] meetingId ou shareUrl ausentes no payload')
+    return Response.json({ ok: true, skipped: true })
+  }
+
+  // Usa service client para ignorar RLS (webhook não tem sessão de usuário)
+  let supabase
+  try {
+    supabase = createServiceClient()
+  } catch (err) {
+    console.error('[zoom-webhook] Falha ao criar service client:', err)
+    // Fallback: endpoint fica acessível mas não envia email
+    return Response.json({ error: 'supabase não configurado' }, { status: 500 })
+  }
+
+  const { data: aula, error: dbError } = await supabase
     .from('classes')
     .select(`
       *,
@@ -78,7 +111,16 @@ export async function POST(request: Request) {
     .limit(1)
     .single()
 
-  if (!aula) return Response.json({ ok: true, skipped: true })
+  if (dbError) {
+    console.warn('[zoom-webhook] Aula não encontrada para meetingId:', meetingId, 'erro:', dbError.message)
+  }
+
+  if (!aula) {
+    console.warn('[zoom-webhook] Nenhuma aula com zoom_meeting_id =', meetingId)
+    return Response.json({ ok: true, skipped: true })
+  }
+
+  console.log('[zoom-webhook] Aula encontrada:', aula.id, '— enviando emails...')
 
   const student   = aula.student as { name: string; email: string | null; responsible_name: string | null; responsible_email: string | null } | null
   const professor = aula.professor as { name: string } | null
@@ -88,30 +130,30 @@ export async function POST(request: Request) {
     ? (student.responsible_name ?? student.name)
     : student?.name ?? 'Aluno'
 
-  const start       = toBRT(aula.scheduled_at as string)
-  const dateStr     = format(start, "EEEE, dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })
+  const start        = toBRT(aula.scheduled_at as string)
+  const dateStr      = format(start, "EEEE, dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })
   const subjectLabel = aula.subject ? (subjectLabels[aula.subject as string] ?? aula.subject) : null
   const levelLabel   = levelLabels[aula.level as string] ?? aula.level
 
   const recordingHtml = (greeting: string, intro: string) => `
 <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/></head>
-<body style="margin:0;padding:0;background:#f5f7f5;font-family:sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7f5;padding:32px 16px;">
+<body style="margin:0;padding:0;background:#f0f4f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4f0;padding:40px 16px;">
   <tr><td align="center">
     <table width="560" cellpadding="0" cellspacing="0"
-           style="background:white;border-radius:12px;overflow:hidden;border:1px solid #d4e8d4;">
+           style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
       <tr>
-        <td style="background:#1e6b40;padding:24px 32px;">
-          <p style="margin:0;color:white;font-size:20px;font-weight:700;">Desttra Educação</p>
-          <p style="margin:4px 0 0;color:#a7d4b8;font-size:13px;">Gravação de aula disponível</p>
+        <td style="background:linear-gradient(135deg,#1e6b40,#2da862);padding:28px 40px;text-align:center;">
+          <p style="margin:0;color:white;font-size:22px;font-weight:800;letter-spacing:-0.5px;">Desttra Educação</p>
+          <p style="margin:6px 0 0;color:#a7d4b8;font-size:13px;">Gravação de aula disponível</p>
         </td>
       </tr>
       <tr>
-        <td style="padding:28px 32px;">
+        <td style="padding:36px 40px;">
           <p style="margin:0 0 6px;color:#6b8c6b;font-size:13px;">${greeting}</p>
-          <p style="margin:0 0 24px;color:#0d2e1e;font-size:15px;line-height:1.5;">${intro}</p>
+          <p style="margin:0 0 28px;color:#0d2e1e;font-size:15px;line-height:1.6;">${intro}</p>
           <table width="100%" cellpadding="0" cellspacing="0"
-                 style="background:#f5f7f5;border-radius:8px;padding:16px;margin-bottom:24px;">
+                 style="background:#f8fdf9;border-radius:10px;padding:18px 20px;margin-bottom:28px;border:1px solid #e0f0e6;">
             <tr>
               <td style="padding:4px 0;color:#6b8c6b;font-size:13px;width:100px;">Aluno</td>
               <td style="padding:4px 0;color:#0d2e1e;font-size:13px;font-weight:600;">${student?.name ?? '—'}</td>
@@ -133,25 +175,29 @@ export async function POST(request: Request) {
               <td style="padding:4px 0;color:#0d2e1e;font-size:13px;text-transform:capitalize;">${dateStr}</td>
             </tr>
           </table>
-          <div style="text-align:center;padding:8px 0 8px;">
+          <div style="text-align:center;padding:8px 0 16px;">
             <a href="${shareUrl}" target="_blank"
                style="display:inline-block;background:#1e6b40;color:white;text-decoration:none;
-                      padding:14px 36px;border-radius:8px;font-size:15px;font-weight:700;">
+                      padding:14px 40px;border-radius:10px;font-size:15px;font-weight:700;letter-spacing:0.3px;">
               ▶ Assistir Gravação
             </a>
+            <p style="margin:14px 0 4px;color:#6b8c6b;font-size:12px;">ou acesse pelo link:</p>
+            <p style="margin:0;font-size:11px;word-break:break-all;">
+              <a href="${shareUrl}" style="color:#1e6b40;text-decoration:underline;">${shareUrl}</a>
+            </p>
           </div>
-          <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:12px 16px;margin-top:12px;">
+          <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:14px 18px;margin-top:8px;">
             <p style="margin:0;color:#7a5800;font-size:13px;line-height:1.5;">
               <strong>⚠️ Atenção:</strong> esta gravação fica disponível por <strong>15 dias</strong>.
-              Se quiser guardar a aula, acesse o link acima e faça o download no seu computador antes que ela expire.
+              Se quiser guardar a aula, acesse o link acima e faça o download antes que ela expire.
             </p>
           </div>
         </td>
       </tr>
       <tr>
-        <td style="padding:16px 32px;border-top:1px solid #e8f0e8;background:#fafcfa;">
+        <td style="padding:18px 40px;border-top:1px solid #e8f0e8;background:#fafcfa;text-align:center;">
           <p style="margin:0;color:#9dbfa9;font-size:11px;">
-            Email automático da plataforma Desttra. Dúvidas: gestao@desttra.com
+            Email automático da plataforma Desttra &nbsp;·&nbsp; Dúvidas: gestao@desttra.com
           </p>
         </td>
       </tr>
@@ -171,6 +217,8 @@ export async function POST(request: Request) {
         `A gravação da aula de <strong>${student?.name ?? 'seu aluno'}</strong> já está disponível.`,
       ),
     }))
+  } else {
+    console.warn('[zoom-webhook] Nenhum email de destinatário para aula:', aula.id)
   }
 
   emailJobs.push(sendEmail({
@@ -184,10 +232,25 @@ export async function POST(request: Request) {
 
   await Promise.allSettled(emailJobs)
 
+  console.log('[zoom-webhook] Emails enviados para aula:', aula.id)
   return Response.json({ ok: true })
 }
 
-// Permite verificar se o endpoint está online
+// Permite verificar se o endpoint está online e as variáveis estão configuradas
 export async function GET() {
-  return Response.json({ ok: true, endpoint: 'zoom-webhook', secret: !!process.env.ZOOM_WEBHOOK_SECRET_TOKEN })
+  const hasWebhookSecret = !!process.env.ZOOM_WEBHOOK_SECRET_TOKEN
+  const hasServiceKey    = !!process.env.SUPABASE_SERVICE_ROLE_KEY
+  const hasResendKey     = !!process.env.RESEND_API_KEY
+  const hasZoomCreds     = !!(process.env.ZOOM_ACCOUNT_ID && process.env.ZOOM_CLIENT_ID && process.env.ZOOM_CLIENT_SECRET)
+
+  return Response.json({
+    ok: true,
+    endpoint: 'zoom-webhook',
+    config: {
+      ZOOM_WEBHOOK_SECRET_TOKEN: hasWebhookSecret,
+      SUPABASE_SERVICE_ROLE_KEY: hasServiceKey,
+      RESEND_API_KEY: hasResendKey,
+      ZOOM_CREDENTIALS: hasZoomCreds,
+    },
+  })
 }
