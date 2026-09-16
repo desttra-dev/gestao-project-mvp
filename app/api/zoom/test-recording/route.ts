@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic'
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { sendEmail } from '@/lib/email'
+import { testZoomCredentials } from '@/lib/zoom'
 import { toBRT } from '@/lib/date-utils'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -41,12 +42,19 @@ export async function GET(request: Request) {
     ZOOM_CLIENT_SECRET:        !!process.env.ZOOM_CLIENT_SECRET,
   }
 
-  const list = url.searchParams.get('list') === '1'
+  const list     = url.searchParams.get('list') === '1'
+  const zoomTest = url.searchParams.get('zoom_test') === '1'
+
+  // Teste de credenciais Zoom
+  if (zoomTest) {
+    const result = await testZoomCredentials()
+    return Response.json({ env: envStatus, zoom_credentials: result })
+  }
 
   if (!meetingId && !classId) {
     if (!list) {
       return Response.json({
-        info: 'Use ?list=1 para ver últimas aulas, ?meeting_id=XXXX ou ?class_id=UUID para testar. Adicione &send=1 para enviar.',
+        info: 'Use ?list=1 para ver últimas aulas, ?zoom_test=1 para testar credenciais Zoom, ?meeting_id=XXXX ou ?class_id=UUID para testar. Adicione &send=1 para enviar.',
         env: envStatus,
       })
     }
