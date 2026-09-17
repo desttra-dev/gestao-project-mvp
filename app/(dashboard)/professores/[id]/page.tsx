@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import { ProfessorForm } from '@/components/forms/professor-form'
+import { ProfessorPortalCredentials } from '@/components/professor/professor-portal-credentials'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -26,6 +27,10 @@ export default async function EditarProfessorPage({ params }: { params: Promise<
         <h1 className="text-2xl font-bold text-slate-900">Editar Professor</h1>
       </div>
       <ProfessorForm professor={professor} />
+      <ProfessorPortalCredentials
+        professorId={professor.id}
+        currentPortalEmail={professor.portal_email ?? ''}
+      />
     </div>
   )
 }
