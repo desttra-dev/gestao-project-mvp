@@ -34,8 +34,12 @@ export async function proxy(request: NextRequest) {
   const isProfessorPortal = /^\/professor(\/|$)/.test(pathname) || pathname.startsWith('/api/professor')
   // Rotas públicas do portal (sem cookie)
   const isProfessorPublic = pathname === '/professor/login'
+    || pathname === '/professor/esqueci-senha'
+    || pathname === '/professor/redefinir-senha'
     || pathname === '/api/professor/login'
     || pathname === '/api/professor/logout'
+    || pathname === '/api/professor/forgot-password'
+    || pathname === '/api/professor/reset-password'
 
   if (isProfessorPortal) {
     if (isProfessorPublic) return NextResponse.next()
@@ -72,6 +76,8 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const isAuthPage  = pathname.startsWith('/login')
+    || pathname.startsWith('/esqueci-senha')
+    || pathname.startsWith('/redefinir-senha')
   const isPublicApi = pathname.startsWith('/api/zoom/webhook')
 
   if (!user && !isAuthPage && !isPublicApi) {

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function ProfessorLoginPage() {
   const router = useRouter()
@@ -65,9 +66,12 @@ export default function ProfessorLoginPage() {
           </div>
 
           <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '13px', color: '#6b8c6b', marginBottom: '6px', fontWeight: 600 }}>
-              Senha
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ fontSize: '13px', color: '#6b8c6b', fontWeight: 600 }}>Senha</label>
+              <Link href="/professor/esqueci-senha" style={{ fontSize: '12px', color: '#1e6b40', textDecoration: 'none', fontWeight: 600 }}>
+                Esqueci minha senha
+              </Link>
+            </div>
             <div style={{ position: 'relative' }}>
               <input
                 type={showPassword ? 'text' : 'password'}
