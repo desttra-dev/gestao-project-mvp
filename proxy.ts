@@ -30,12 +30,15 @@ export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // ── Rotas do portal do professor ──────────────────────────────────────────
-  const isProfessorLogin = pathname === '/professor/login'
   // Só rotas /professor e /professor/* — NÃO /professores (área admin)
   const isProfessorPortal = /^\/professor(\/|$)/.test(pathname) || pathname.startsWith('/api/professor')
+  // Rotas públicas do portal (sem cookie)
+  const isProfessorPublic = pathname === '/professor/login'
+    || pathname === '/api/professor/login'
+    || pathname === '/api/professor/logout'
 
   if (isProfessorPortal) {
-    if (isProfessorLogin) return NextResponse.next()
+    if (isProfessorPublic) return NextResponse.next()
     const token = request.cookies.get('professor_token')?.value
     const valid = token ? await verifyProfessorCookie(token) : false
     if (!valid) {

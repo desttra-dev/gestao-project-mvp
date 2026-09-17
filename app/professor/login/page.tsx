@@ -7,6 +7,7 @@ export default function ProfessorLoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -20,12 +21,13 @@ export default function ProfessorLoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Erro ao entrar'); setLoading(false); return }
+      let data: { error?: string } = {}
+      try { data = await res.json() } catch { /* resposta não era JSON */ }
+      if (!res.ok) { setError(data.error ?? `Erro ${res.status}`); setLoading(false); return }
       router.push('/professor')
       router.refresh()
     } catch {
-      setError('Erro de conexão')
+      setError('Sem conexão com o servidor. Tente novamente.')
       setLoading(false)
     }
   }
@@ -66,15 +68,30 @@ export default function ProfessorLoginPage() {
             <label style={{ display: 'block', fontSize: '13px', color: '#6b8c6b', marginBottom: '6px', fontWeight: 600 }}>
               Senha
             </label>
-            <input
-              type="password" value={password} onChange={e => setPassword(e.target.value)} required
-              placeholder="••••••••"
-              style={{
-                width: '100%', padding: '10px 12px', border: '1.5px solid #d4e8d4',
-                borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box',
-                color: '#0d2e1e',
-              }}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password} onChange={e => setPassword(e.target.value)} required
+                placeholder="••••••••"
+                style={{
+                  width: '100%', padding: '10px 40px 10px 12px', border: '1.5px solid #d4e8d4',
+                  borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box',
+                  color: '#0d2e1e',
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                style={{
+                  position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
+                  color: '#9dbfa9', fontSize: '16px', lineHeight: 1,
+                }}
+                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+              >
+                {showPassword ? '🙈' : '👁'}
+              </button>
+            </div>
           </div>
 
           {error && (
