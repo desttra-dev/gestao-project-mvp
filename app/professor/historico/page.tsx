@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { verifyProfessorToken } from '@/lib/professor-auth'
 import { createServiceClient } from '@/lib/supabase/service'
 import { ProfessorHeader } from '@/components/professor/professor-header'
+import { MonthSelector } from '@/components/professor/month-selector'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -80,23 +81,9 @@ export default async function HistoricoPage({ searchParams }: { searchParams: Pr
           <p style={{ margin:0, fontSize:'11px', fontWeight:700, color:'#9dbfa9', textTransform:'uppercase', letterSpacing:'1px' }}>
             Histórico
           </p>
-          <form method="GET" action="/professor/historico" style={{ marginLeft:'auto' }}>
-            <select
-              name="mes"
-              defaultValue={selectedMonth}
-              onChange={e => (e.target.form as HTMLFormElement).submit()}
-              style={{
-                padding:'6px 10px', border:'1.5px solid #d4e8d4', borderRadius:'8px',
-                fontSize:'13px', color:'#0d2e1e', background:'white', cursor:'pointer', outline:'none',
-              }}
-            >
-              {monthOptions.map(o => (
-                <option key={o.value} value={o.value} style={{ textTransform:'capitalize' }}>
-                  {o.label.charAt(0).toUpperCase() + o.label.slice(1)}
-                </option>
-              ))}
-            </select>
-          </form>
+          <div style={{ marginLeft: 'auto' }}>
+            <MonthSelector value={selectedMonth} options={monthOptions} />
+          </div>
         </div>
 
         {/* Summary chips */}
