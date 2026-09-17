@@ -79,6 +79,7 @@ export async function proxy(request: NextRequest) {
     || pathname.startsWith('/esqueci-senha')
     || pathname.startsWith('/redefinir-senha')
   const isPublicApi = pathname.startsWith('/api/zoom/webhook')
+    || pathname.startsWith('/api/cron/')
 
   if (!user && !isAuthPage && !isPublicApi) {
     const url = request.nextUrl.clone()
