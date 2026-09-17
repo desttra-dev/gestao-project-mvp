@@ -2,9 +2,36 @@ export const dynamic = 'force-dynamic'
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifyPassword, signProfessorToken } from '@/lib/professor-auth'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
+
+// In-memory rate limit: ip → { count, windowStart }
+const attempts = new Map<string, { count: number; windowStart: number }>()
+const MAX_ATTEMPTS = 5
+const WINDOW_MS    = 15 * 60 * 1000 // 15 min
+
+function isRateLimited(ip: string): boolean {
+  const now  = Date.now()
+  const rec  = attempts.get(ip)
+  if (!rec || now - rec.windowStart > WINDOW_MS) {
+    attempts.set(ip, { count: 1, windowStart: now })
+    return false
+  }
+  rec.count++
+  return rec.count > MAX_ATTEMPTS
+}
+
+function clearRateLimit(ip: string) {
+  attempts.delete(ip)
+}
 
 export async function POST(request: Request) {
+  const headersList = await headers()
+  const ip = headersList.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+
+  if (isRateLimited(ip)) {
+    return Response.json({ error: 'Muitas tentativas. Aguarde 15 minutos.' }, { status: 429 })
+  }
+
   const { email, password } = await request.json()
   if (!email || !password) {
     return Response.json({ error: 'Email e senha obrigatórios' }, { status: 400 })
@@ -25,6 +52,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Credenciais inválidas' }, { status: 401 })
   }
 
+  clearRateLimit(ip)
   const token = signProfessorToken(professor.id)
   const cookieStore = await cookies()
   cookieStore.set('professor_token', token, {

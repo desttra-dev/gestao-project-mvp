@@ -1,6 +1,10 @@
 import { createHmac, scryptSync, randomBytes, timingSafeEqual } from 'crypto'
 
-const secret = () => process.env.PROFESSOR_JWT_SECRET ?? 'CHANGE_ME_IN_ENV'
+const secret = () => {
+  const s = process.env.PROFESSOR_JWT_SECRET
+  if (!s) throw new Error('PROFESSOR_JWT_SECRET não configurado')
+  return s
+}
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString('hex')

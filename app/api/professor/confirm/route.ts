@@ -19,8 +19,15 @@ export async function POST(request: Request) {
     notes?: string
   }
 
+  const VALID_STATUS = ['realizada', 'nao_houve'] as const
+  const VALID_REASON = ['aluno_faltou', 'professor_faltou', 'nao_devia_existir', 'outros'] as const
+
   if (!classId || !status) return Response.json({ error: 'Dados incompletos' }, { status: 400 })
+  if (!VALID_STATUS.includes(status)) return Response.json({ error: 'Status inválido' }, { status: 400 })
   if (status === 'nao_houve' && !reason) return Response.json({ error: 'Motivo obrigatório' }, { status: 400 })
+  if (reason && !VALID_REASON.includes(reason as typeof VALID_REASON[number])) {
+    return Response.json({ error: 'Motivo inválido' }, { status: 400 })
+  }
 
   const supabase = createServiceClient()
 

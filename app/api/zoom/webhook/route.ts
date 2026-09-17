@@ -243,21 +243,6 @@ export async function POST(request: Request) {
   return Response.json({ ok: true })
 }
 
-// Permite verificar se o endpoint está online e as variáveis estão configuradas
 export async function GET() {
-  const hasWebhookSecret = !!process.env.ZOOM_WEBHOOK_SECRET_TOKEN
-  const hasServiceKey    = !!process.env.SUPABASE_SERVICE_ROLE_KEY
-  const hasResendKey     = !!process.env.RESEND_API_KEY
-  const hasZoomCreds     = !!(process.env.ZOOM_ACCOUNT_ID && process.env.ZOOM_CLIENT_ID && process.env.ZOOM_CLIENT_SECRET)
-
-  return Response.json({
-    ok: true,
-    endpoint: 'zoom-webhook',
-    config: {
-      ZOOM_WEBHOOK_SECRET_TOKEN: hasWebhookSecret,
-      SUPABASE_SERVICE_ROLE_KEY: hasServiceKey,
-      RESEND_API_KEY: hasResendKey,
-      ZOOM_CREDENTIALS: hasZoomCreds,
-    },
-  })
+  return new Response(null, { status: 405 })
 }
