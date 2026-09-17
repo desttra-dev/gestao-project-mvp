@@ -31,7 +31,8 @@ export async function proxy(request: NextRequest) {
 
   // ── Rotas do portal do professor ──────────────────────────────────────────
   const isProfessorLogin = pathname === '/professor/login'
-  const isProfessorPortal = pathname.startsWith('/professor') || pathname.startsWith('/api/professor')
+  // Só rotas /professor e /professor/* — NÃO /professores (área admin)
+  const isProfessorPortal = /^\/professor(\/|$)/.test(pathname) || pathname.startsWith('/api/professor')
 
   if (isProfessorPortal) {
     if (isProfessorLogin) return NextResponse.next()
