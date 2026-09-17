@@ -1,3 +1,4 @@
+import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -12,7 +13,20 @@ const subjectLabels: Record<string, string> = {
   filosofia: 'Filosofia', redacao: 'Redação', sociologia: 'Sociologia',
 }
 
+function esc(s: string | null | undefined): string {
+  return (s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+}
+
 export async function POST(request: Request) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return Response.json({ error: 'Não autorizado' }, { status: 401 })
+
   const body = await request.json() as {
     professorEmail: string
     professorName: string
@@ -61,33 +75,33 @@ export async function POST(request: Request) {
       <tr>
         <td style="padding:28px 32px;">
           <p style="margin:0 0 6px;color:#6b8c6b;font-size:13px;">
-            Olá, <strong style="color:#0d2e1e;">${professorName}</strong>
+            Olá, <strong style="color:#0d2e1e;">${esc(professorName)}</strong>
           </p>
           <p style="margin:0 0 24px;color:#0d2e1e;font-size:15px;line-height:1.5;">
             ${isSeries
-              ? `Uma série de <strong>${dates.length} aulas</strong> foi agendada com o aluno <strong>${studentName}</strong>.`
-              : `Uma nova aula foi agendada com o aluno <strong>${studentName}</strong>.`}
+              ? `Uma série de <strong>${dates.length} aulas</strong> foi agendada com o aluno <strong>${esc(studentName)}</strong>.`
+              : `Uma nova aula foi agendada com o aluno <strong>${esc(studentName)}</strong>.`}
           </p>
 
           <table width="100%" cellpadding="0" cellspacing="0"
                  style="background:#f5f7f5;border-radius:8px;padding:16px;margin-bottom:24px;">
             <tr>
               <td style="padding:4px 0;color:#6b8c6b;font-size:13px;width:100px;">Aluno</td>
-              <td style="padding:4px 0;color:#0d2e1e;font-size:13px;font-weight:600;">${studentName}</td>
+              <td style="padding:4px 0;color:#0d2e1e;font-size:13px;font-weight:600;">${esc(studentName)}</td>
             </tr>
             <tr>
               <td style="padding:4px 0;color:#6b8c6b;font-size:13px;">Nível</td>
-              <td style="padding:4px 0;color:#0d2e1e;font-size:13px;">${levelLabel}</td>
+              <td style="padding:4px 0;color:#0d2e1e;font-size:13px;">${esc(levelLabel)}</td>
             </tr>
             ${subjectLabel ? `
             <tr>
               <td style="padding:4px 0;color:#6b8c6b;font-size:13px;">Matéria</td>
-              <td style="padding:4px 0;color:#0d2e1e;font-size:13px;">${subjectLabel}</td>
+              <td style="padding:4px 0;color:#0d2e1e;font-size:13px;">${esc(subjectLabel)}</td>
             </tr>` : ''}
             ${notes ? `
             <tr>
               <td style="padding:4px 0;color:#6b8c6b;font-size:13px;vertical-align:top;">Obs.</td>
-              <td style="padding:4px 0;color:#4a5a4a;font-size:13px;">${notes}</td>
+              <td style="padding:4px 0;color:#4a5a4a;font-size:13px;">${esc(notes)}</td>
             </tr>` : ''}
           </table>
 

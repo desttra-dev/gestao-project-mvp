@@ -46,9 +46,9 @@ export async function GET(request: Request) {
     .map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
     .join('\n')
 
-  const from = de  ?? 'inicio'
-  const to   = ate ?? 'fim'
-  const filename = `lancamentos_${from}_${to}.csv`
+  const safeDate = (s: string | null, fallback: string) =>
+    (s ?? fallback).replace(/[^0-9\-]/g, '').slice(0, 10)
+  const filename = `lancamentos_${safeDate(de, 'inicio')}_${safeDate(ate, 'fim')}.csv`
 
   return new Response('﻿' + csv, {
     headers: {
