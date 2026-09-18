@@ -155,8 +155,8 @@ export async function GET(request: Request) {
 
   for (const cls of classes) {
     try {
-      const student   = cls.student as { name: string; email: string | null; responsible_name: string | null; responsible_email: string | null } | null
-      const professor = cls.professor as { name: string; email: string | null } | null
+      const student   = cls.student as unknown as { name: string; email: string | null; responsible_name: string | null; responsible_email: string | null } | null
+      const professor = cls.professor as unknown as { name: string; email: string | null } | null
 
       const startBRT = toBRT(cls.scheduled_at as string)
       const endBRT   = cls.ends_at ? toBRT(cls.ends_at as string) : null
