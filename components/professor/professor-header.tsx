@@ -9,6 +9,7 @@ const NAV = [
   { href: '/professor/historico',     label: 'Histórico' },
   { href: '/professor/pagamentos',    label: 'Pagamentos' },
   { href: '/professor/configuracoes', label: 'Configurações' },
+  { href: '/professor/ajuda',         label: 'Ajuda' },
 ]
 
 export function ProfessorHeader({ professorName }: { professorName: string }) {
