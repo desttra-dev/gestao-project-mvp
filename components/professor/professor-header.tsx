@@ -5,8 +5,9 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 const NAV = [
-  { href: '/professor',              label: 'Início' },
-  { href: '/professor/historico',    label: 'Histórico' },
+  { href: '/professor',               label: 'Início' },
+  { href: '/professor/historico',     label: 'Histórico' },
+  { href: '/professor/pagamentos',    label: 'Pagamentos' },
   { href: '/professor/configuracoes', label: 'Configurações' },
 ]
 

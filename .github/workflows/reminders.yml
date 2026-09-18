@@ -1,0 +1,15 @@
+name: Lembretes de aula
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'  # a cada 15 minutos
+  workflow_dispatch:         # permite rodar manualmente pelo GitHub
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar endpoint de lembretes
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            "https://gestao.desttra.com/api/cron/reminders?secret=${{ secrets.CRON_SECRET }}"

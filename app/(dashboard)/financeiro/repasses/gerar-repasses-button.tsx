@@ -28,6 +28,7 @@ export function GerarRepassesButton({ month, year }: GerarRepassesButtonProps) {
       .from('classes')
       .select('teacher_id, level')
       .eq('status', 'realizada')
+      .eq('confirmation_status', 'realizada')
       .gte('scheduled_at', startDate)
       .lte('scheduled_at', endDate)
 
