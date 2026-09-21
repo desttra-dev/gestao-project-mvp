@@ -64,6 +64,7 @@ export default async function ProfessorDashboard() {
     { data: upcomingClasses },
     { data: monthClasses },
     { count: pendingCount },
+    { data: announcements },
   ] = await Promise.all([
     supabase.from('classes')
       .select('id,scheduled_at,ends_at,level,subject,status,confirmation_status,no_show_reason,no_show_notes,zoom_join_url,student:students(name)')
@@ -93,6 +94,12 @@ export default async function ProfessorDashboard() {
       .lt('scheduled_at', todayStart)
       .is('confirmation_status', null)
       .not('status', 'in', '("cancelada","remarcada")'),
+
+    supabase.from('announcements')
+      .select('id, title, body, pinned')
+      .eq('active', true)
+      .order('pinned', { ascending: false })
+      .order('created_at', { ascending: false }),
   ])
 
   const levelCounts: Record<string, number> = {}
@@ -123,6 +130,28 @@ export default async function ProfessorDashboard() {
                 Você tem aulas anteriores que ainda não foram confirmadas.
               </p>
             </div>
+          </div>
+        )}
+
+        {/* Avisos da gestão */}
+        {(announcements ?? []).length > 0 && (
+          <div style={{ marginBottom: '20px' }}>
+            {(announcements ?? []).map((a: any) => (
+              <div key={a.id} style={{
+                background: a.pinned ? '#fffbeb' : '#f0fdf4',
+                border: `1.5px solid ${a.pinned ? '#fde68a' : '#86efac'}`,
+                borderRadius: '12px', padding: '14px 16px', marginBottom: '8px',
+                display: 'flex', gap: '10px', alignItems: 'flex-start',
+              }}>
+                <span style={{ fontSize: '18px', flexShrink: 0, marginTop: '1px' }}>
+                  {a.pinned ? '📌' : '📢'}
+                </span>
+                <div>
+                  <p style={{ margin: '0 0 3px', fontSize: '14px', fontWeight: 700, color: '#0d2e1e' }}>{a.title}</p>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#4a5a4a', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{a.body}</p>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 

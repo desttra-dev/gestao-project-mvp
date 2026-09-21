@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
   DollarSign, Settings, LogOut,
-  ChevronDown, BookCheck, Menu, X, Banknote,
+  ChevronDown, BookCheck, Menu, X, Banknote, Megaphone,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -25,6 +25,13 @@ const navItems = [
     ],
   },
   {
+    label: 'Comunicados',
+    icon: Megaphone,
+    children: [
+      { label: 'Avisos', href: '/comunicados/avisos', icon: Megaphone },
+    ],
+  },
+  {
     label: 'Configurações',
     icon: Settings,
     children: [
@@ -38,7 +45,7 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const [openGroups, setOpenGroups] = useState<string[]>(['Configurações', 'Financeiro'])
+  const [openGroups, setOpenGroups] = useState<string[]>(['Configurações', 'Financeiro', 'Comunicados'])
 
   const toggleGroup = (label: string) => {
     setOpenGroups(prev =>
