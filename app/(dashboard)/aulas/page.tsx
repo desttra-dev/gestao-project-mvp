@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { AulasView } from '@/components/aulas-view'
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { Plus, Download } from 'lucide-react'
 import { format } from 'date-fns'
 
 export default async function AulasPage({
@@ -44,12 +44,20 @@ export default async function AulasPage({
             <span style={{ color: '#6b8c6b' }}>{total} no total</span>
           </p>
         </div>
-        <Link href="/aulas/nova" className="flex-shrink-0">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Aula
-          </Button>
-        </Link>
+        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+          <Link href="/aulas/exportar">
+            <Button variant="outline">
+              <Download className="h-4 w-4 mr-2" />
+              Exportar
+            </Button>
+          </Link>
+          <Link href="/aulas/nova">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Aula
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <AulasView
