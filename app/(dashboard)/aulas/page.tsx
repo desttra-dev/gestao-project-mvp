@@ -16,11 +16,17 @@ export default async function AulasPage({
   const supabase = await createClient()
   const hoje = format(new Date(), "yyyy-MM-dd'T'00:00:00")
 
+  // Janela: 60 dias atrás até o futuro (sem limite superior)
+  // Garante que aulas recentes e todas as futuras apareçam no calendário
+  const since = new Date()
+  since.setDate(since.getDate() - 60)
+  const sinceIso = since.toISOString().slice(0, 10) + 'T00:00:00'
+
   let query = supabase
     .from('classes')
     .select('*, student:students(name), professor:professors(name)')
+    .gte('scheduled_at', sinceIso)
     .order('scheduled_at', { ascending: true })
-    .limit(500)
 
   if (professor_id) query = query.eq('teacher_id', professor_id)
 
