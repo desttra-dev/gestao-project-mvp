@@ -24,7 +24,7 @@ export default async function AulasPage({
 
   let query = supabase
     .from('classes')
-    .select('*, student:students(name), professor:professors(name)')
+    .select('*, series_id, student:students(name), professor:professors(name)')
     .gte('scheduled_at', sinceIso)
     .order('scheduled_at', { ascending: true })
 

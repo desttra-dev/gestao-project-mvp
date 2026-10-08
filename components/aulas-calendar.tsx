@@ -9,7 +9,7 @@ import {
   getHours, getMinutes,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, CalendarDays, CalendarRange, Clock, X, Pencil, CheckCircle, XCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CalendarDays, CalendarRange, Clock, X, Pencil, CheckCircle, XCircle, Trash2, AlertTriangle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 
@@ -46,6 +46,7 @@ interface ClassItem {
   status: string
   level: string
   subject?: string | null
+  series_id?: string | null
   student: { name: string } | null
   professor: { name: string } | null
 }
@@ -83,7 +84,8 @@ function EventPopup({
   onUpdated: () => void
 }) {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading]       = useState(false)
+  const [deleteStep, setDeleteStep] = useState(false)
   const start = new Date(event.scheduled_at)
   const end   = getEndsAt(event)
   const st    = statusStyle[event.status] ?? statusStyle.agendada
@@ -111,6 +113,25 @@ function EventPopup({
     })
     setLoading(false)
     toast.success('Aula cancelada.')
+    onClose()
+    onUpdated()
+  }
+
+  const excluir = async (scope: 'single' | 'following') => {
+    setLoading(true)
+    const res = await fetch('/api/aulas/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        aulaId:      event.id,
+        scope,
+        seriesId:    event.series_id,
+        scheduledAt: event.scheduled_at,
+      }),
+    })
+    setLoading(false)
+    if (!res.ok) { toast.error('Erro ao excluir'); return }
+    toast.success(scope === 'single' ? 'Aula excluída.' : 'Aulas excluídas.')
     onClose()
     onUpdated()
   }
@@ -161,40 +182,97 @@ function EventPopup({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <button
-            onClick={() => router.push(`/aulas/${event.id}`)}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50"
-            style={{ border: '1px solid #d4e8d4', color: '#0d2e1e' }}
-          >
-            <Pencil className="h-4 w-4" style={{ color: '#1e6b40' }} />
-            Editar / Reagendar
-          </button>
-
-          {event.status === 'agendada' && (
+        {!deleteStep ? (
+          <div className="space-y-2">
             <button
-              onClick={marcarRealizada}
-              disabled={loading}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-green-50"
-              style={{ border: '1px solid #bbf7d0', color: '#1e6b40' }}
+              onClick={() => router.push(`/aulas/${event.id}`)}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50"
+              style={{ border: '1px solid #d4e8d4', color: '#0d2e1e' }}
             >
-              <CheckCircle className="h-4 w-4" />
-              Confirmar como Realizada
+              <Pencil className="h-4 w-4" style={{ color: '#1e6b40' }} />
+              Editar / Reagendar
             </button>
-          )}
 
-          {event.status !== 'cancelada' && (
+            {event.status === 'agendada' && (
+              <button
+                onClick={marcarRealizada}
+                disabled={loading}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-green-50"
+                style={{ border: '1px solid #bbf7d0', color: '#1e6b40' }}
+              >
+                <CheckCircle className="h-4 w-4" />
+                Confirmar como Realizada
+              </button>
+            )}
+
+            {event.status !== 'cancelada' && (
+              <button
+                onClick={cancelar}
+                disabled={loading}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-red-50"
+                style={{ border: '1px solid #fcd4d4', color: '#b91c1c' }}
+              >
+                <XCircle className="h-4 w-4" />
+                Cancelar Aula
+              </button>
+            )}
+
             <button
-              onClick={cancelar}
+              onClick={() => setDeleteStep(true)}
               disabled={loading}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-red-50"
-              style={{ border: '1px solid #fcd4d4', color: '#b91c1c' }}
+              style={{ border: '1px solid #fca5a5', color: '#7f1d1d' }}
             >
-              <XCircle className="h-4 w-4" />
-              Cancelar Aula
+              <Trash2 className="h-4 w-4" />
+              Excluir Aula
             </button>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div>
+            <div
+              className="flex items-start gap-2 rounded-lg p-3 mb-3"
+              style={{ backgroundColor: '#fff7ed', border: '1px solid #fed7aa' }}
+            >
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: '#c2410c' }} />
+              <p className="text-xs" style={{ color: '#9a3412' }}>
+                Esta ação é <strong>permanente e irreversível</strong>. O registro será removido do banco de dados.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                onClick={() => excluir('single')}
+                disabled={loading}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-red-50"
+                style={{ border: '1px solid #fca5a5', color: '#7f1d1d' }}
+              >
+                <Trash2 className="h-4 w-4" />
+                Excluir apenas esta aula
+              </button>
+
+              {event.series_id && (
+                <button
+                  onClick={() => excluir('following')}
+                  disabled={loading}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-red-50"
+                  style={{ border: '1px solid #fca5a5', color: '#7f1d1d' }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Excluir esta e as seguintes
+                </button>
+              )}
+
+              <button
+                onClick={() => setDeleteStep(false)}
+                disabled={loading}
+                className="w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50"
+                style={{ border: '1px solid #d4e8d4', color: '#6b8c6b' }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
