@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
   DollarSign, Settings, LogOut,
-  ChevronDown, BookCheck, Menu, X, Banknote, Megaphone,
+  ChevronDown, BookCheck, Menu, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -17,20 +17,6 @@ const navItems = [
   { label: 'Alunos',      href: '/alunos',                    icon: Users           },
   { label: 'Professores', href: '/professores',               icon: GraduationCap   },
   { label: 'Aulas',       href: '/aulas',                     icon: BookOpen        },
-  {
-    label: 'Financeiro',
-    icon: Banknote,
-    children: [
-      { label: 'Repasses',  href: '/financeiro/repasses',  icon: DollarSign },
-    ],
-  },
-  {
-    label: 'Comunicados',
-    icon: Megaphone,
-    children: [
-      { label: 'Avisos', href: '/comunicados/avisos', icon: Megaphone },
-    ],
-  },
   {
     label: 'Configurações',
     icon: Settings,
@@ -45,7 +31,7 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const [openGroups, setOpenGroups] = useState<string[]>(['Configurações', 'Financeiro', 'Comunicados'])
+  const [openGroups, setOpenGroups] = useState<string[]>(['Configurações'])
 
   const toggleGroup = (label: string) => {
     setOpenGroups(prev =>
