@@ -9,7 +9,7 @@ import {
   getHours, getMinutes,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, CalendarDays, CalendarRange, Clock, X, Pencil, CheckCircle, XCircle, Trash2, AlertTriangle, Video, Copy } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CalendarDays, CalendarRange, Clock, X, Pencil, CheckCircle, XCircle, Trash2, AlertTriangle, Video, Copy, List } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 
@@ -52,7 +52,7 @@ interface ClassItem {
   professor: { name: string } | null
 }
 
-type CalView = 'mes' | 'semana' | 'dia'
+type CalView = 'mes' | 'semana' | 'dia' | 'lista'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -569,6 +569,87 @@ function MonthView({
   )
 }
 
+// ─── List View ────────────────────────────────────────────────────────────────
+
+function ListView({
+  classes,
+  onEventClick,
+}: {
+  classes: ClassItem[]
+  onEventClick: (c: ClassItem) => void
+}) {
+  const sorted = [...classes].sort(
+    (a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
+  )
+
+  const groups: { dayKey: string; day: Date; items: ClassItem[] }[] = []
+  for (const c of sorted) {
+    const day    = new Date(c.scheduled_at)
+    const dayKey = format(day, 'yyyy-MM-dd')
+    const last   = groups[groups.length - 1]
+    if (last?.dayKey === dayKey) last.items.push(c)
+    else groups.push({ dayKey, day, items: [c] })
+  }
+
+  if (groups.length === 0) {
+    return (
+      <div className="rounded-xl border py-12 text-center" style={{ borderColor: '#d4e8d4' }}>
+        <p style={{ color: '#9dbfa9' }}>Nenhuma aula encontrada.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {groups.map(g => (
+        <div key={g.dayKey}>
+          <p
+            className="font-semibold capitalize text-sm mb-2 px-1"
+            style={{ color: isToday(g.day) ? '#1e6b40' : '#6b8c6b' }}
+          >
+            {format(g.day, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+            {isToday(g.day) && ' · hoje'}
+          </p>
+          <div className="space-y-1.5">
+            {g.items.map(c => {
+              const st  = statusStyle[c.status] ?? statusStyle.agendada
+              const end = getEndsAt(c)
+              return (
+                <div
+                  key={c.id}
+                  onClick={() => onEventClick(c)}
+                  className="flex items-center gap-3 p-3 rounded-lg bg-white border cursor-pointer hover:shadow-sm transition-shadow"
+                  style={{ borderColor: '#d4e8d4' }}
+                >
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: st.dot }} />
+                  <div className="flex-shrink-0 text-center" style={{ minWidth: 48 }}>
+                    <p className="text-sm font-bold" style={{ color: '#0d2e1e' }}>
+                      {format(new Date(c.scheduled_at), 'HH:mm')}
+                    </p>
+                    <p className="text-xs" style={{ color: '#9dbfa9' }}>{format(end, 'HH:mm')}</p>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: '#0d2e1e' }}>
+                      {c.student?.name ?? '—'}
+                    </p>
+                    <p className="text-xs truncate" style={{ color: '#6b8c6b' }}>
+                      Prof. {c.professor?.name ?? '—'} · {c.subject ? subjectLabels[c.subject] : levelLabels[c.level]}
+                    </p>
+                  </div>
+                  {c.zoom_join_url && (
+                    <Video className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#2D8CFF' }} />
+                  )}
+                  <Badge variant="outline" style={{ fontSize: '0.7rem', flexShrink: 0 }}>{st.label}</Badge>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function AulasCalendar({ classes }: { classes: ClassItem[] }) {
@@ -597,6 +678,8 @@ export function AulasCalendar({ classes }: { classes: ClassItem[] }) {
     ? format(current, 'MMMM yyyy', { locale: ptBR })
     : view === 'semana'
     ? `${format(weekDays[0], "dd 'de' MMM", { locale: ptBR })} – ${format(weekDays[6], "dd 'de' MMM yyyy", { locale: ptBR })}`
+    : view === 'lista'
+    ? 'Todas as aulas'
     : format(current, "EEEE, dd 'de' MMMM yyyy", { locale: ptBR })
 
   return (
@@ -612,22 +695,28 @@ export function AulasCalendar({ classes }: { classes: ClassItem[] }) {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1">
-          <button onClick={goPrev} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-            <ChevronLeft className="h-4 w-4" style={{ color: '#1e6b40' }} />
-          </button>
+          {view !== 'lista' && (
+            <button onClick={goPrev} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+              <ChevronLeft className="h-4 w-4" style={{ color: '#1e6b40' }} />
+            </button>
+          )}
           <h2 className="text-base font-semibold capitalize px-1 min-w-[200px] text-center" style={{ color: '#0d2e1e' }}>
             {title}
           </h2>
-          <button onClick={goNext} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-            <ChevronRight className="h-4 w-4" style={{ color: '#1e6b40' }} />
-          </button>
-          <button
-            onClick={() => setCurrent(new Date())}
-            className="ml-1 px-3 py-1 rounded-lg text-xs font-medium transition-colors hover:bg-gray-100"
-            style={{ color: '#1e6b40', border: '1px solid #d4e8d4' }}
-          >
-            Hoje
-          </button>
+          {view !== 'lista' && (
+            <button onClick={goNext} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+              <ChevronRight className="h-4 w-4" style={{ color: '#1e6b40' }} />
+            </button>
+          )}
+          {view !== 'lista' && (
+            <button
+              onClick={() => setCurrent(new Date())}
+              className="ml-1 px-3 py-1 rounded-lg text-xs font-medium transition-colors hover:bg-gray-100"
+              style={{ color: '#1e6b40', border: '1px solid #d4e8d4' }}
+            >
+              Hoje
+            </button>
+          )}
         </div>
 
         <div className="flex p-0.5 rounded-lg gap-0.5" style={{ backgroundColor: '#f5f7f5', border: '1px solid #d4e8d4' }}>
@@ -635,6 +724,7 @@ export function AulasCalendar({ classes }: { classes: ClassItem[] }) {
             { key: 'mes',    icon: CalendarRange, label: 'Mês'    },
             { key: 'semana', icon: CalendarDays,  label: 'Semana' },
             { key: 'dia',    icon: Clock,         label: 'Dia'    },
+            { key: 'lista',  icon: List,          label: 'Lista'  },
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -664,6 +754,7 @@ export function AulasCalendar({ classes }: { classes: ClassItem[] }) {
           <TimeGrid days={[current]} classes={classes} onEventClick={setSelectedEvent} />
         </div>
       )}
+      {view === 'lista'  && <ListView classes={classes} onEventClick={setSelectedEvent} />}
     </div>
   )
 }
