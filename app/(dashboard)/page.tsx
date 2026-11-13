@@ -8,12 +8,7 @@ import { ptBR } from 'date-fns/locale'
 import { toBRT } from '@/lib/date-utils'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-
-const statusStyle: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-  agendada:  { bg: '#e8faf0', text: '#1e6b40', dot: '#1e6b40', label: 'Agendada'  },
-  realizada: { bg: '#f3f4f6', text: '#6b7280', dot: '#9ca3af', label: 'Realizada' },
-  cancelada: { bg: '#fee2e2', text: '#b91c1c', dot: '#ef4444', label: 'Cancelada' },
-}
+import { TodayClassRow } from '@/components/today-class-row'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -145,46 +140,9 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {(todayClasses ?? []).map(c => {
-                const st      = statusStyle[c.status] ?? statusStyle.agendada
-                const startBRT = toBRT(c.scheduled_at)
-                const endBRT   = c.ends_at ? toBRT(c.ends_at) : null
-                const isPast   = c.scheduled_at < nowUTC.toISOString()
-                return (
-                  <Link key={c.id} href={`/aulas/${c.id}`}>
-                    <div
-                      className="flex items-center gap-3 p-3 rounded-xl border transition-all hover:shadow-sm"
-                      style={{
-                        borderColor: '#e4f0e4',
-                        backgroundColor: isPast && c.status === 'agendada' ? '#fefce8' : 'white',
-                        opacity: c.status === 'cancelada' ? 0.6 : 1,
-                      }}
-                    >
-                      <div className="w-1 h-10 rounded-full flex-shrink-0" style={{ backgroundColor: st.dot }} />
-                      <div className="flex-shrink-0 text-center" style={{ minWidth: 50 }}>
-                        <p className="text-sm font-bold" style={{ color: '#0d2e1e' }}>
-                          {format(startBRT, 'HH:mm')}
-                        </p>
-                        {endBRT && (
-                          <p className="text-xs" style={{ color: '#9dbfa9' }}>{format(endBRT, 'HH:mm')}</p>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate" style={{ color: '#0d2e1e' }}>
-                          {(c.student as any)?.name ?? '—'}
-                        </p>
-                        <p className="text-xs truncate" style={{ color: '#6b8c6b' }}>
-                          Prof. {(c.professor as any)?.name ?? '—'}
-                        </p>
-                      </div>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: st.bg, color: st.text }}>
-                        {st.label}
-                      </span>
-                    </div>
-                  </Link>
-                )
-              })}
+              {(todayClasses ?? []).map(c => (
+                <TodayClassRow key={c.id} aula={c as any} nowIso={nowUTC.toISOString()} />
+              ))}
             </div>
           )}
         </CardContent>
