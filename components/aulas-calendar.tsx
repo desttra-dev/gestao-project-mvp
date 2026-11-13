@@ -9,7 +9,7 @@ import {
   getHours, getMinutes,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, CalendarDays, CalendarRange, Clock, X, Pencil, CheckCircle, XCircle, Trash2, AlertTriangle, Video } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CalendarDays, CalendarRange, Clock, X, Pencil, CheckCircle, XCircle, Trash2, AlertTriangle, Video, Copy } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 
@@ -90,6 +90,16 @@ function EventPopup({
   const start = new Date(event.scheduled_at)
   const end   = getEndsAt(event)
   const st    = statusStyle[event.status] ?? statusStyle.agendada
+
+  const copiarLink = async () => {
+    if (!event.zoom_join_url) return
+    try {
+      await navigator.clipboard.writeText(event.zoom_join_url)
+      toast.success('Link copiado!')
+    } catch {
+      toast.error('Não foi possível copiar o link')
+    }
+  }
 
   const marcarRealizada = async () => {
     setLoading(true)
@@ -184,16 +194,30 @@ function EventPopup({
         </div>
 
         {event.zoom_join_url ? (
-          <a
-            href={event.zoom_join_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:opacity-90 mb-2"
-            style={{ backgroundColor: '#2D8CFF', color: 'white' }}
-          >
-            <Video className="h-4 w-4" />
-            Entrar no Zoom
-          </a>
+          <div className="rounded-lg p-2.5 mb-3" style={{ border: '1px solid #d4e8d4', backgroundColor: '#f8fdf9' }}>
+            <p className="text-xs flex items-center gap-1 mb-1.5" style={{ color: '#6b8c6b' }}>
+              <Video className="h-3.5 w-3.5" style={{ color: '#2D8CFF' }} />
+              Link do Zoom
+            </p>
+            <div className="flex items-center gap-1.5">
+              <input
+                readOnly
+                value={event.zoom_join_url}
+                onFocus={e => e.target.select()}
+                className="flex-1 min-w-0 text-xs px-2 py-1.5 rounded-md bg-white truncate"
+                style={{ border: '1px solid #d4e8d4', color: '#0d2e1e' }}
+              />
+              <button
+                type="button"
+                onClick={copiarLink}
+                title="Copiar link"
+                className="flex-shrink-0 p-1.5 rounded-md transition-colors hover:bg-gray-100"
+                style={{ border: '1px solid #d4e8d4' }}
+              >
+                <Copy className="h-3.5 w-3.5" style={{ color: '#1e6b40' }} />
+              </button>
+            </div>
+          </div>
         ) : (
           <p className="text-xs mb-3" style={{ color: '#9dbfa9' }}>
             Link do Zoom ainda não disponível para esta aula.
