@@ -9,7 +9,7 @@ import {
   getHours, getMinutes,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, CalendarDays, CalendarRange, Clock, X, Pencil, CheckCircle, XCircle, Trash2, AlertTriangle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CalendarDays, CalendarRange, Clock, X, Pencil, CheckCircle, XCircle, Trash2, AlertTriangle, Video } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 
@@ -47,6 +47,7 @@ interface ClassItem {
   level: string
   subject?: string | null
   series_id?: string | null
+  zoom_join_url?: string | null
   student: { name: string } | null
   professor: { name: string } | null
 }
@@ -181,6 +182,23 @@ function EventPopup({
             </Badge>
           </div>
         </div>
+
+        {event.zoom_join_url ? (
+          <a
+            href={event.zoom_join_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:opacity-90 mb-2"
+            style={{ backgroundColor: '#2D8CFF', color: 'white' }}
+          >
+            <Video className="h-4 w-4" />
+            Entrar no Zoom
+          </a>
+        ) : (
+          <p className="text-xs mb-3" style={{ color: '#9dbfa9' }}>
+            Link do Zoom ainda não disponível para esta aula.
+          </p>
+        )}
 
         {!deleteStep ? (
           <div className="space-y-2">
