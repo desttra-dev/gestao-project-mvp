@@ -17,6 +17,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  // O build host da Hostinger reporta dezenas de CPUs (ex: 58), mas o container
+  // só suporta poucas threads de verdade — sem isso o build trava com
+  // "OS can't spawn worker thread: Resource temporarily unavailable".
+  experimental: {
+    cpus: 2,
+  },
   async headers() {
     return [
       {
