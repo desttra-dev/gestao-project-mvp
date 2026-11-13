@@ -10,6 +10,8 @@ interface ClassItem {
   status: string
   level: string
   subject?: string | null
+  series_id?: string | null
+  zoom_join_url?: string | null
   student: { name: string } | null
   professor: { name: string } | null
 }
