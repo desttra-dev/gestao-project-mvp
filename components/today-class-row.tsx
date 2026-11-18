@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { Copy } from 'lucide-react'
 import { toast } from 'sonner'
-import { toBRT } from '@/lib/date-utils'
 
 const statusStyle: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   agendada:  { bg: '#e8faf0', text: '#1e6b40', dot: '#1e6b40', label: 'Agendada'  },
@@ -25,8 +24,8 @@ interface TodayClass {
 export function TodayClassRow({ aula, nowIso }: { aula: TodayClass; nowIso: string }) {
   const router = useRouter()
   const st       = statusStyle[aula.status] ?? statusStyle.agendada
-  const startBRT = toBRT(aula.scheduled_at)
-  const endBRT   = aula.ends_at ? toBRT(aula.ends_at) : null
+  const start    = new Date(aula.scheduled_at)
+  const end      = aula.ends_at ? new Date(aula.ends_at) : null
   const isPast   = aula.scheduled_at < nowIso
 
   const copiarLink = async (e: React.MouseEvent) => {
@@ -54,10 +53,10 @@ export function TodayClassRow({ aula, nowIso }: { aula: TodayClass; nowIso: stri
       <div className="w-1 h-10 rounded-full flex-shrink-0" style={{ backgroundColor: st.dot }} />
       <div className="flex-shrink-0 text-center" style={{ minWidth: 50 }}>
         <p className="text-sm font-bold" style={{ color: '#0d2e1e' }}>
-          {format(startBRT, 'HH:mm')}
+          {format(start, 'HH:mm')}
         </p>
-        {endBRT && (
-          <p className="text-xs" style={{ color: '#9dbfa9' }}>{format(endBRT, 'HH:mm')}</p>
+        {end && (
+          <p className="text-xs" style={{ color: '#9dbfa9' }}>{format(end, 'HH:mm')}</p>
         )}
       </div>
       <div className="flex-1 min-w-0">
